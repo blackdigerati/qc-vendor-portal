@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { PullOrdersDialog } from './pull-dialog'
+import { NotesCell } from './notes-cell'
 
 export type QueueItem = {
   id: string
@@ -166,7 +167,6 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
           {filtered.map(o => {
             const st = orderState(o)
             const sel = st !== 'none'
-            const totalQty = o.items.reduce((acc, i) => acc + i.qty, 0)
             return (
               <Fragment key={o.orderNumber}>
                 <tr className={`border-t border-slate-200 ${sel ? 'bg-emerald-50/60' : 'hover:bg-slate-50'} ${o.urgent ? 'border-l-2 border-l-red-500' : ''}`}>
@@ -194,17 +194,11 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                   </td>
                   <td className="px-3 py-1.5 align-middle text-slate-800">{o.customer || <span className="text-slate-400">—</span>}</td>
                   <td className="px-3 py-1.5 align-middle text-slate-600">{o.email}</td>
-                  <td className="px-3 py-1.5 align-middle text-slate-600">
-                    {o.notes ? (
-                      <span className="block max-w-[280px] truncate" title={o.notes}>
-                        {o.notes}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
+                  <td className="px-3 py-1 align-middle text-slate-600">
+                    <NotesCell orderNumber={o.orderNumber} initial={o.notes} />
                   </td>
-                  <td className="px-3 py-1.5 align-middle text-right text-slate-700 tabular-nums font-medium">{totalQty}</td>
-                  <td className="px-3 py-1.5 align-middle text-right text-slate-400 tabular-nums">—</td>
+                  <td className="px-3 py-1.5 align-middle text-right tabular-nums"></td>
+                  <td className="px-3 py-1.5 align-middle text-right tabular-nums"></td>
                 </tr>
                 {o.items.map(i => {
                   const checked = selected.has(i.id)
