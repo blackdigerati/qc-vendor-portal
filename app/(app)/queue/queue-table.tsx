@@ -169,7 +169,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
             const sel = st !== 'none'
             return (
               <Fragment key={o.orderNumber}>
-                <tr className={`border-t-2 border-slate-300 ${sel ? 'bg-emerald-100' : 'bg-slate-100'} ${o.urgent ? 'border-l-2 border-l-red-500' : ''}`}>
+                <tr className={`border-t-2 border-slate-400 ${sel ? 'bg-emerald-200/70' : 'bg-slate-200'} ${o.urgent ? 'border-l-4 border-l-red-600' : ''}`}>
                   <td className="px-3 py-1.5 align-middle">
                     <Checkbox
                       checked={st === 'all'}
