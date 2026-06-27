@@ -36,6 +36,7 @@ export default async function QueuePage() {
     customer: [o.firstName, o.lastName].filter(Boolean).join(' '),
     city: o.city,
     state: o.state,
+    notes: o.notes,
     urgent: o.urgent,
     needsMerge: mergeEmails.has(o.email),
     items: items
@@ -45,7 +46,7 @@ export default async function QueuePage() {
         sku: i.sku,
         name: i.name,
         qty: i.qty,
-        cost: fromCents(i.costOfGoodsCents),
+        unitPrice: fromCents(i.costOfGoodsCents),
         skuMissing: !!i.sku && !knownSkus.has(i.sku),
       })),
   }))

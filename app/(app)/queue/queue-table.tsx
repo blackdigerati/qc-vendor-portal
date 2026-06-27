@@ -13,7 +13,7 @@ export type QueueItem = {
   sku: string
   name: string
   qty: number
-  cost: string
+  unitPrice: string
   skuMissing: boolean
 }
 export type QueueOrder = {
@@ -22,6 +22,7 @@ export type QueueOrder = {
   customer: string
   city: string
   state: string
+  notes: string
   urgent: boolean
   needsMerge: boolean
   items: QueueItem[]
@@ -40,6 +41,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
       o.orderNumber.toLowerCase().includes(q) ||
       o.email.toLowerCase().includes(q) ||
       o.customer.toLowerCase().includes(q) ||
+      o.notes.toLowerCase().includes(q) ||
       o.items.some(i => i.sku.toLowerCase().includes(q) || i.name.toLowerCase().includes(q)),
     )
   }, [orders, filter])
@@ -117,7 +119,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
           <Input
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            placeholder="Filter order#, email, customer, SKU…"
+            placeholder="Filter order#, email, customer, SKU, notes…"
             className="h-7 max-w-xs text-[13px] bg-white"
           />
           <div className="text-[12px] text-slate-600">
@@ -144,14 +146,16 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
             <th className="px-3 py-2 text-left font-semibold w-28">Order</th>
             <th className="px-3 py-2 text-left font-semibold">Customer</th>
             <th className="px-3 py-2 text-left font-semibold">Email</th>
-            <th className="px-3 py-2 text-left font-semibold">Ship to</th>
-            <th className="px-3 py-2 text-right font-semibold w-16">Items</th>
+            <th className="px-3 py-2 text-left font-semibold w-36">Ship to</th>
+            <th className="px-3 py-2 text-left font-semibold w-52">Notes</th>
+            <th className="px-3 py-2 text-right font-semibold w-16">Qty</th>
+            <th className="px-3 py-2 text-right font-semibold w-24">Unit Price</th>
           </tr>
         </thead>
         <tbody>
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
+              <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
                 {orders.length === 0 ? (
                   <>Queue is empty. Click <span className="font-medium text-slate-700">Pull new orders</span> to import.</>
                 ) : (
@@ -163,6 +167,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
           {filtered.map(o => {
             const st = orderState(o)
             const sel = st !== 'none'
+            const totalQty = o.items.reduce((acc, i) => acc + i.qty, 0)
             return (
               <Fragment key={o.orderNumber}>
                 <tr className={`border-t border-slate-200 ${sel ? 'bg-emerald-50/60' : 'hover:bg-slate-50'} ${o.urgent ? 'border-l-2 border-l-red-500' : ''}`}>
@@ -191,7 +196,20 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                   <td className="px-3 py-1.5 align-middle text-slate-800">{o.customer || <span className="text-slate-400">—</span>}</td>
                   <td className="px-3 py-1.5 align-middle text-slate-600">{o.email}</td>
                   <td className="px-3 py-1.5 align-middle text-slate-600">{[o.city, o.state].filter(Boolean).join(', ')}</td>
-                  <td className="px-3 py-1.5 align-middle text-right text-slate-600">{o.items.length}</td>
+                  <td className="px-3 py-1.5 align-middle text-slate-600">
+                    {o.notes ? (
+                      <span
+                        className="block max-w-[200px] truncate"
+                        title={o.notes}
+                      >
+                        {o.notes}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 align-middle text-right text-slate-700 tabular-nums font-medium">{totalQty}</td>
+                  <td className="px-3 py-1.5 align-middle text-right text-slate-400 tabular-nums">—</td>
                 </tr>
                 {o.items.map(i => {
                   const checked = selected.has(i.id)
@@ -203,8 +221,11 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                           onCheckedChange={v => toggleItem(i.id, !!v)}
                         />
                       </td>
-                      <td colSpan={4} className="px-3 py-1 align-middle text-slate-700">
-                        <span className="font-mono text-[11px] text-slate-500 mr-2 inline-block w-24 align-middle">{i.sku || <span className="text-slate-400">no-sku</span>}</span>
+                      <td className="px-3 py-1 align-middle"></td>
+                      <td colSpan={5} className="px-3 py-1 align-middle text-slate-700">
+                        <span className="font-mono text-[11px] text-slate-500 mr-2 inline-block w-24 align-middle">
+                          {i.sku || <span className="text-slate-400">no-sku</span>}
+                        </span>
                         <span className="align-middle">{i.name}</span>
                         {i.skuMissing && (
                           <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-300 align-middle">
@@ -212,9 +233,8 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-1 align-middle text-right text-slate-600 tabular-nums">
-                        ×{i.qty} <span className="text-slate-400">· {i.cost}</span>
-                      </td>
+                      <td className="px-3 py-1 align-middle text-right text-slate-700 tabular-nums">{i.qty}</td>
+                      <td className="px-3 py-1 align-middle text-right text-slate-700 tabular-nums">{i.unitPrice}</td>
                     </tr>
                   )
                 })}
