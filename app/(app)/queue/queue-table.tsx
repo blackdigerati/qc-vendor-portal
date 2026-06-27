@@ -169,7 +169,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
             const sel = st !== 'none'
             return (
               <Fragment key={o.orderNumber}>
-                <tr className={`border-t border-slate-200 ${sel ? 'bg-emerald-50/60' : 'hover:bg-slate-50'} ${o.urgent ? 'border-l-2 border-l-red-500' : ''}`}>
+                <tr className={`border-t-2 border-slate-300 ${sel ? 'bg-emerald-100' : 'bg-slate-100'} ${o.urgent ? 'border-l-2 border-l-red-500' : ''}`}>
                   <td className="px-3 py-1.5 align-middle">
                     <Checkbox
                       checked={st === 'all'}
@@ -203,7 +203,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                 {o.items.map(i => {
                   const checked = selected.has(i.id)
                   return (
-                    <tr key={i.id} className={`border-t border-slate-100 ${checked ? 'bg-emerald-50/40' : 'bg-slate-50/40'}`}>
+                    <tr key={i.id} className={`border-t border-slate-200 ${checked ? 'bg-emerald-50' : 'bg-white hover:bg-slate-50'}`}>
                       <td className="pl-8 pr-3 py-1 align-middle">
                         <Checkbox
                           checked={checked}
@@ -211,7 +211,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                         />
                       </td>
                       <td className="px-3 py-1 align-middle"></td>
-                      <td colSpan={4} className="px-3 py-1 align-middle text-slate-700">
+                      <td colSpan={3} className="px-3 py-1 align-middle text-slate-700">
                         <span className="font-mono text-[11px] text-slate-500 mr-2 inline-block w-24 align-middle">
                           {i.sku || <span className="text-slate-400">no-sku</span>}
                         </span>
