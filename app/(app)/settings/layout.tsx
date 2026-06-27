@@ -10,15 +10,15 @@ const items = [
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin()
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight mb-6">Settings</h1>
-      <div className="grid grid-cols-[200px_1fr] gap-8">
-        <nav className="space-y-1 text-sm">
+    <div className="space-y-3">
+      <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
+      <div className="grid grid-cols-[180px_1fr] gap-4">
+        <nav className="space-y-0.5 text-[13px] bg-white border border-slate-300 rounded-md shadow-sm p-1.5 h-fit">
           {items.map(i => (
             <Link
               key={i.href}
               href={i.href}
-              className="block px-3 py-2 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              className="block px-2.5 py-1.5 rounded text-slate-700 hover:text-slate-900 hover:bg-slate-100"
             >
               {i.label}
             </Link>

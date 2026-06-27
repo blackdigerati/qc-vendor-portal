@@ -1,4 +1,4 @@
-import { desc, eq, inArray, ne } from 'drizzle-orm'
+import { desc, inArray } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { QueueTable, type QueueOrder } from './queue-table'
 import { fromCents } from '@/lib/money'
@@ -26,7 +26,6 @@ export default async function QueuePage() {
   const skuRows = db.select({ sku: schema.skus.sku }).from(schema.skus).all()
   const knownSkus = new Set(skuRows.map(r => r.sku))
 
-  // Merge candidates: queued orders sharing an email
   const emailCounts = new Map<string, number>()
   for (const o of orders) emailCounts.set(o.email, (emailCounts.get(o.email) || 0) + 1)
   const mergeEmails = new Set([...emailCounts.entries()].filter(([, n]) => n > 1).map(([e]) => e))
@@ -51,19 +50,19 @@ export default async function QueuePage() {
       })),
   }))
 
+  const urgentCount = data.filter(o => o.urgent).length
   const totalMissing = data.reduce((acc, o) => acc + o.items.filter(i => i.skuMissing).length, 0)
 
   return (
-    <div>
-      <div className="flex items-end justify-between mb-6">
+    <div className="space-y-3">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Queue</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {data.length} order{data.length === 1 ? '' : 's'} ready to ship.
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Order Queue</h1>
+          <p className="text-[13px] text-slate-600 mt-0.5">
+            <span className="font-medium text-slate-900">{data.length}</span> ready to ship
+            {urgentCount > 0 && <> · <span className="text-red-600 font-medium">{urgentCount} urgent</span></>}
             {totalMissing > 0 && (
-              <span className="text-amber-600 ml-2">
-                {totalMissing} item{totalMissing === 1 ? '' : 's'} have unknown SKUs (set cost before billing).
-              </span>
+              <> · <span className="text-amber-700 font-medium">{totalMissing} items missing SKU</span></>
             )}
           </p>
         </div>

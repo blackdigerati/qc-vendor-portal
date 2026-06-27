@@ -33,17 +33,17 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 bg-white p-6 rounded-lg border shadow-sm">
+    <form onSubmit={onSubmit} className="space-y-3 bg-white p-5 rounded-md border border-slate-300 shadow-xl">
       <div className="space-y-1.5">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email" className="text-[12px] font-semibold uppercase tracking-wider text-slate-600">Email</Label>
         <Input id="email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password" className="text-[12px] font-semibold uppercase tracking-wider text-slate-600">Password</Label>
         <Input id="password" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" className="w-full" disabled={loading}>
+      {error && <p className="text-[13px] text-red-600">{error}</p>}
+      <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800" disabled={loading}>
         {loading ? 'Signing in…' : 'Sign in'}
       </Button>
     </form>

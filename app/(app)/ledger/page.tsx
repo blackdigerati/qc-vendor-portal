@@ -9,7 +9,12 @@ export default async function LedgerPage() {
   const l = getLedger()
   const ob = db.select().from(schema.ledgerOpeningBalance).get()
   const invoices = db.select().from(schema.invoices).orderBy(desc(schema.invoices.createdAt)).all()
-  const payments = db.select().from(schema.payments).where(eq(schema.payments.status, 'approved')).orderBy(desc(schema.payments.paidOn)).all()
+  const payments = db
+    .select()
+    .from(schema.payments)
+    .where(eq(schema.payments.status, 'approved'))
+    .orderBy(desc(schema.payments.paidOn))
+    .all()
 
   type Row = { date: Date; label: string; debitCents: number; creditCents: number }
   const rows: Row[] = []
@@ -25,34 +30,36 @@ export default async function LedgerPage() {
   })
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Ledger</h1>
-      <p className="text-sm text-slate-500 mt-1 mb-6">
-        Current balance: <span className="font-medium text-slate-900">{fromCents(l.currentBalanceCents)}</span>
-        <span className="ml-3 text-slate-500">Invoiced {fromCents(l.invoicedCents)} · Paid {fromCents(l.paidCents)}</span>
-      </p>
-      <div className="bg-white border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600">
-            <tr className="text-left">
-              <th className="px-4 py-2 font-medium">Date</th>
-              <th className="px-4 py-2 font-medium">Description</th>
-              <th className="px-4 py-2 font-medium text-right">Charge</th>
-              <th className="px-4 py-2 font-medium text-right">Payment</th>
-              <th className="px-4 py-2 font-medium text-right">Balance</th>
+    <div className="space-y-3">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Ledger</h1>
+        <p className="text-[13px] text-slate-600 mt-0.5">
+          Current balance: <span className="font-semibold text-slate-900 tabular-nums">{fromCents(l.currentBalanceCents)}</span>
+          <span className="ml-3 text-slate-500">Invoiced <span className="font-medium tabular-nums">{fromCents(l.invoicedCents)}</span> · Paid <span className="font-medium tabular-nums">{fromCents(l.paidCents)}</span></span>
+        </p>
+      </div>
+      <div className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
+        <table className="w-full text-[13px] border-collapse">
+          <thead>
+            <tr className="bg-slate-800 text-slate-100 text-[11px] uppercase tracking-wider">
+              <th className="px-3 py-2 text-left font-semibold w-28">Date</th>
+              <th className="px-3 py-2 text-left font-semibold">Description</th>
+              <th className="px-3 py-2 text-right font-semibold w-28">Charge</th>
+              <th className="px-3 py-2 text-right font-semibold w-28">Payment</th>
+              <th className="px-3 py-2 text-right font-semibold w-28">Balance</th>
             </tr>
           </thead>
           <tbody>
             {display.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-500">No entries yet.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-500">No entries yet.</td></tr>
             )}
             {display.map((r, i) => (
-              <tr key={i} className="border-t">
-                <td className="px-4 py-2 text-slate-600">{r.date.toLocaleDateString()}</td>
-                <td className="px-4 py-2">{r.label}</td>
-                <td className="px-4 py-2 text-right text-slate-700">{r.debitCents ? fromCents(r.debitCents) : ''}</td>
-                <td className="px-4 py-2 text-right text-emerald-700">{r.creditCents ? fromCents(r.creditCents) : ''}</td>
-                <td className="px-4 py-2 text-right font-medium">{fromCents(r.runningCents)}</td>
+              <tr key={i} className="border-t border-slate-200 hover:bg-slate-50">
+                <td className="px-3 py-1.5 text-slate-600 tabular-nums">{r.date.toLocaleDateString()}</td>
+                <td className="px-3 py-1.5">{r.label}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-slate-800">{r.debitCents ? fromCents(r.debitCents) : ''}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-emerald-700 font-medium">{r.creditCents ? fromCents(r.creditCents) : ''}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{fromCents(r.runningCents)}</td>
               </tr>
             ))}
           </tbody>

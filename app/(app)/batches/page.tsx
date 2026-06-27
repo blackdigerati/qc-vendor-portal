@@ -1,55 +1,61 @@
 import Link from 'next/link'
 import { desc } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
-import { Badge } from '@/components/ui/badge'
 import { fromCents } from '@/lib/money'
 
 export const dynamic = 'force-dynamic'
 
-const statusColor: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  pending: 'secondary',
-  partially_shipped: 'outline',
-  shipped: 'default',
-  invoiced: 'default',
+function statusPill(status: string) {
+  const map: Record<string, string> = {
+    pending: 'bg-slate-200 text-slate-800',
+    partially_shipped: 'bg-amber-100 text-amber-900 border border-amber-300',
+    shipped: 'bg-blue-100 text-blue-900 border border-blue-300',
+    invoiced: 'bg-emerald-100 text-emerald-900 border border-emerald-300',
+  }
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${map[status] || 'bg-slate-200 text-slate-800'}`}>
+      {status.replace('_', ' ')}
+    </span>
+  )
 }
 
 export default async function BatchesPage() {
   const batches = db.select().from(schema.batches).orderBy(desc(schema.batches.createdAt)).all()
-  const invs = batches.length
-    ? db.select().from(schema.invoices).all()
-    : []
+  const invs = batches.length ? db.select().from(schema.invoices).all() : []
   const invMap = new Map(invs.map(i => [i.id, i]))
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Batches</h1>
-      <p className="text-sm text-slate-500 mt-1 mb-6">All ShipStation pushes, status, and resulting invoices.</p>
-      <div className="bg-white border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600">
-            <tr className="text-left">
-              <th className="px-4 py-2 font-medium">Batch</th>
-              <th className="px-4 py-2 font-medium">Created</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Invoice</th>
-              <th className="px-4 py-2 font-medium text-right">Total</th>
+    <div className="space-y-3">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Batches</h1>
+        <p className="text-[13px] text-slate-600 mt-0.5">{batches.length} batch{batches.length === 1 ? '' : 'es'} total</p>
+      </div>
+      <div className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
+        <table className="w-full text-[13px] border-collapse">
+          <thead>
+            <tr className="bg-slate-800 text-slate-100 text-[11px] uppercase tracking-wider">
+              <th className="px-3 py-2 text-left font-semibold w-36">Batch</th>
+              <th className="px-3 py-2 text-left font-semibold w-44">Created</th>
+              <th className="px-3 py-2 text-left font-semibold w-36">Status</th>
+              <th className="px-3 py-2 text-left font-semibold w-36">Invoice</th>
+              <th className="px-3 py-2 text-right font-semibold">Total</th>
             </tr>
           </thead>
           <tbody>
             {batches.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-500">No batches yet.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-500">No batches yet.</td></tr>
             )}
             {batches.map(b => {
               const inv = b.invoiceId ? invMap.get(b.invoiceId) : undefined
               return (
-                <tr key={b.id} className="border-t hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium">
-                    <Link href={`/batches/${b.id}`} className="hover:underline">{b.id}</Link>
+                <tr key={b.id} className="border-t border-slate-200 hover:bg-slate-50">
+                  <td className="px-3 py-1.5 font-mono font-semibold">
+                    <Link href={`/batches/${b.id}`} className="hover:underline text-slate-900">{b.id}</Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{new Date(b.createdAt).toLocaleString()}</td>
-                  <td className="px-4 py-3"><Badge variant={statusColor[b.status] || 'secondary'}>{b.status.replace('_', ' ')}</Badge></td>
-                  <td className="px-4 py-3 text-slate-600">{inv?.id || '—'}</td>
-                  <td className="px-4 py-3 text-right text-slate-600">{inv ? fromCents(inv.totalCents) : '—'}</td>
+                  <td className="px-3 py-1.5 text-slate-600 tabular-nums">{new Date(b.createdAt).toLocaleString()}</td>
+                  <td className="px-3 py-1.5">{statusPill(b.status)}</td>
+                  <td className="px-3 py-1.5 text-slate-600 font-mono">{inv?.id || <span className="text-slate-400">—</span>}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums font-medium">{inv ? fromCents(inv.totalCents) : <span className="text-slate-400">—</span>}</td>
                 </tr>
               )
             })}
