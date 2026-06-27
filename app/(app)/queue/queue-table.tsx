@@ -146,8 +146,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
             <th className="px-3 py-2 text-left font-semibold w-28">Order</th>
             <th className="px-3 py-2 text-left font-semibold">Customer</th>
             <th className="px-3 py-2 text-left font-semibold">Email</th>
-            <th className="px-3 py-2 text-left font-semibold w-36">Ship to</th>
-            <th className="px-3 py-2 text-left font-semibold w-52">Notes</th>
+            <th className="px-3 py-2 text-left font-semibold">Notes</th>
             <th className="px-3 py-2 text-right font-semibold w-16">Qty</th>
             <th className="px-3 py-2 text-right font-semibold w-24">Unit Price</th>
           </tr>
@@ -155,7 +154,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
         <tbody>
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+              <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
                 {orders.length === 0 ? (
                   <>Queue is empty. Click <span className="font-medium text-slate-700">Pull new orders</span> to import.</>
                 ) : (
@@ -195,13 +194,9 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                   </td>
                   <td className="px-3 py-1.5 align-middle text-slate-800">{o.customer || <span className="text-slate-400">—</span>}</td>
                   <td className="px-3 py-1.5 align-middle text-slate-600">{o.email}</td>
-                  <td className="px-3 py-1.5 align-middle text-slate-600">{[o.city, o.state].filter(Boolean).join(', ')}</td>
                   <td className="px-3 py-1.5 align-middle text-slate-600">
                     {o.notes ? (
-                      <span
-                        className="block max-w-[200px] truncate"
-                        title={o.notes}
-                      >
+                      <span className="block max-w-[280px] truncate" title={o.notes}>
                         {o.notes}
                       </span>
                     ) : (
@@ -222,7 +217,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                         />
                       </td>
                       <td className="px-3 py-1 align-middle"></td>
-                      <td colSpan={5} className="px-3 py-1 align-middle text-slate-700">
+                      <td colSpan={4} className="px-3 py-1 align-middle text-slate-700">
                         <span className="font-mono text-[11px] text-slate-500 mr-2 inline-block w-24 align-middle">
                           {i.sku || <span className="text-slate-400">no-sku</span>}
                         </span>
