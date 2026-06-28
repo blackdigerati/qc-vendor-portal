@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     const lines = [
       `${result.ordersInserted} new orders pulled from ${source}.`,
       `Urgent: ${result.urgentTotal}.`,
-      result.missingSkus.length ? `Missing SKUs: ${result.missingSkus.join(', ')}` : '',
+      result.skusCreated.length ? `New SKUs added to catalog: ${result.skusCreated.join(', ')}` : '',
     ].filter(Boolean).join('\n')
     await sendAlert('new_orders', `Vendor Portal: ${result.ordersInserted} new orders`, lines)
   }

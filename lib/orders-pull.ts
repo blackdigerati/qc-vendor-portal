@@ -9,7 +9,7 @@ export type PullResult = {
   ordersSkipped: number // already existed
   itemsInserted: number
   urgentTotal: number
-  missingSkus: string[]
+  skusCreated: string[] // auto-created SKUs (new to the catalog)
   source: 'sheet' | 'upload'
 }
 
@@ -23,7 +23,7 @@ export async function pullOrders(
     ordersSkipped: 0,
     itemsInserted: 0,
     urgentTotal: 0,
-    missingSkus: [],
+    skusCreated: [],
     source: opts.source,
   }
 
@@ -35,11 +35,11 @@ export async function pullOrders(
     byOrder.set(r.orderNumber, arr)
   }
 
+  // In-memory cache of known SKUs (grows as we auto-create within this pull)
   const skuCache = new Set(
     db.select({ sku: schema.skus.sku }).from(schema.skus).all().map(r => r.sku),
   )
-
-  const missing = new Set<string>()
+  const created = new Set<string>()
 
   for (const [orderNumber, items] of byOrder) {
     const head = items[0]
@@ -69,6 +69,20 @@ export async function pullOrders(
     if (urgent) result.urgentTotal++
 
     for (const it of items) {
+      // Auto-create the SKU on first sight. Never overwrite an existing one
+      // (the CSV could carry a typo / stale cost — Settings is authoritative
+      // once a SKU has been touched).
+      if (it.sku && !skuCache.has(it.sku)) {
+        db.insert(schema.skus).values({
+          sku: it.sku,
+          description: it.name,
+          baseCostCents: it.costOfGoodsCents,
+          active: true,
+        }).run()
+        skuCache.add(it.sku)
+        created.add(it.sku)
+      }
+
       db.insert(schema.orderItems).values({
         id: newId('oi'),
         orderNumber,
@@ -79,11 +93,11 @@ export async function pullOrders(
         status: 'queued',
       }).run()
       result.itemsInserted++
-      if (it.sku && !skuCache.has(it.sku)) missing.add(it.sku)
     }
   }
 
-  result.missingSkus = [...missing].sort()
+  result.skusCreated = [...created].sort()
+
   await writeAudit({
     actor: opts.actor,
     entityType: 'pull',

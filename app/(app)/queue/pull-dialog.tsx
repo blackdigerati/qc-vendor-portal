@@ -55,7 +55,8 @@ export function PullOrdersDialog() {
       }
       const data = await r.json()
       toast.success(
-        `Pulled ${data.ordersInserted} new orders (${data.urgentTotal} urgent). ${data.ordersSkipped} already in queue.`,
+        `Pulled ${data.ordersInserted} new orders (${data.urgentTotal} urgent). ${data.ordersSkipped} already in queue.` +
+          (data.skusCreated?.length ? ` ${data.skusCreated.length} new SKU${data.skusCreated.length === 1 ? '' : 's'} added to catalog.` : ''),
       )
       setOpen(false)
       setFile(null)
