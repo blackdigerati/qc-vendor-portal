@@ -110,7 +110,9 @@ export const payments = sqliteTable('payments', {
   recordedAt: integer('recorded_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   approvedBy: text('approved_by').references(() => users.id),
   approvedAt: integer('approved_at', { mode: 'timestamp' }),
-  status: text('status', { enum: ['vendor_recorded', 'approved', 'rejected'] }).notNull().default('vendor_recorded'),
+  status: text('status', {
+    enum: ['sent', 'received', 'cancelled', 'vendor_recorded', 'approved', 'rejected'],
+  }).notNull().default('sent'),
 })
 
 export const paymentAllocations = sqliteTable('payment_allocations', {

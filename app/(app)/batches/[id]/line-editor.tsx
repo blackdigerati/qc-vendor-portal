@@ -28,16 +28,34 @@ export function BatchLineEditor({
   initialLines,
   invoiceId,
   invoiceTotalCents,
+  isAdmin,
 }: {
   batchId: string
   initialLines: BatchLine[]
   invoiceId: string | null
   invoiceTotalCents: number | null
+  isAdmin: boolean
 }) {
   const router = useRouter()
   const [lines, setLines] = useState<BatchLine[]>(initialLines)
   const [savingSku, setSavingSku] = useState<string | null>(null)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function deleteInvoice() {
+    if (!invoiceId) return
+    if (!confirm(`Delete invoice ${invoiceId} and reopen the batch? Pricing will be re-evaluated when you recreate the invoice.`)) return
+    setDeleting(true)
+    const r = await fetch(`/api/batches/${batchId}/invoice`, { method: 'DELETE' })
+    setDeleting(false)
+    if (!r.ok) {
+      const { error } = await r.json().catch(() => ({ error: 'Delete failed' }))
+      toast.error(error || 'Delete failed')
+      return
+    }
+    toast.success(`Invoice ${invoiceId} deleted — batch reopened`)
+    router.refresh()
+  }
 
   const grouped = useMemo(() => {
     const m = new Map<string, BatchLine[]>()
@@ -232,11 +250,24 @@ export function BatchLineEditor({
             <>Edit COG per line (saves to SKU DB on blur). Handling auto-applies per the rule above. Eyeball the total, then create the invoice.</>
           )}
         </div>
-        {!isInvoiced && (
-          <Button onClick={createInvoice} disabled={creatingInvoice || lines.length === 0} className="bg-emerald-600 hover:bg-emerald-700">
-            {creatingInvoice ? 'Creating…' : `Create Invoice — ${fromCents(grandTotalCents)}`}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isInvoiced && isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={deleteInvoice}
+              disabled={deleting}
+              className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
+            >
+              {deleting ? 'Deleting…' : 'Delete invoice & reopen batch'}
+            </Button>
+          )}
+          {!isInvoiced && (
+            <Button onClick={createInvoice} disabled={creatingInvoice || lines.length === 0} className="bg-emerald-600 hover:bg-emerald-700">
+              {creatingInvoice ? 'Creating…' : `Create Invoice — ${fromCents(grandTotalCents)}`}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )

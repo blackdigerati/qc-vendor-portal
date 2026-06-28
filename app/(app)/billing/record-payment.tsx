@@ -14,7 +14,12 @@ import { fromCents } from '@/lib/money'
 
 type OpenInv = { id: string; openCents: number }
 
-export function RecordPaymentButton({ invoices }: { invoices: OpenInv[] }) {
+export function RecordPaymentButton({ invoices, isAdmin }: { invoices: OpenInv[]; isAdmin: boolean }) {
+  if (!isAdmin) return null
+  return <SendPaymentImpl invoices={invoices} />
+}
+
+function SendPaymentImpl({ invoices }: { invoices: OpenInv[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [amount, setAmount] = useState('')
@@ -68,8 +73,8 @@ export function RecordPaymentButton({ invoices }: { invoices: OpenInv[] }) {
     }
     const d = await r.json()
     toast.success(
-      `Payment recorded. Applied ${fromCents(d.allocated)}` +
-        (d.unallocatedCredit > 0 ? ` · ${fromCents(d.unallocatedCredit)} kept as account credit` : ''),
+      `Payment sent. Vendor will mark received. Allocated ${fromCents(d.allocated)}` +
+        (d.unallocatedCredit > 0 ? ` · ${fromCents(d.unallocatedCredit)} as account credit` : ''),
     )
     setOpen(false)
     reset()
@@ -78,12 +83,12 @@ export function RecordPaymentButton({ invoices }: { invoices: OpenInv[] }) {
 
   return (
     <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset() }}>
-      <DialogTrigger render={<Button className="bg-emerald-600 hover:bg-emerald-700">Record payment</Button>} />
+      <DialogTrigger render={<Button className="bg-emerald-600 hover:bg-emerald-700">Send payment to vendor</Button>} />
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Record payment received</DialogTitle>
+          <DialogTitle>Send payment to vendor</DialogTitle>
           <DialogDescription>
-            Enter the amount, then allocate across one or more open invoices. Any unallocated amount stays as account credit.
+            Record what you paid + how it should be allocated. The vendor will see this as pending until they confirm receipt — the ledger only moves on receipt.
           </DialogDescription>
         </DialogHeader>
 
@@ -169,7 +174,7 @@ export function RecordPaymentButton({ invoices }: { invoices: OpenInv[] }) {
             disabled={busy || !amount || overAllocated}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {busy ? 'Saving…' : 'Record payment'}
+            {busy ? 'Sending…' : 'Send payment'}
           </Button>
         </DialogFooter>
       </DialogContent>

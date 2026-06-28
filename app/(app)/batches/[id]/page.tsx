@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { eq, inArray } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { fromCents } from '@/lib/money'
+import { getSession } from '@/lib/auth'
 import { BatchLineEditor, type BatchLine } from './line-editor'
 
 export const dynamic = 'force-dynamic'
@@ -19,6 +20,8 @@ function pill(text: string, tone: 'slate' | 'red' | 'emerald' | 'blue' | 'amber'
 
 export default async function BatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const session = await getSession()
+  const isAdmin = session.role === 'admin'
   const batch = db.select().from(schema.batches).where(eq(schema.batches.id, id)).get()
   if (!batch) notFound()
 
@@ -88,6 +91,7 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
         initialLines={initialLines}
         invoiceId={invoice?.id ?? null}
         invoiceTotalCents={invoice?.totalCents ?? null}
+        isAdmin={isAdmin}
       />
     </div>
   )

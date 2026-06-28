@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { db, schema } from '@/db/client'
-import { requireSession } from '@/lib/auth'
+import { requireAdmin } from '@/lib/auth'
 import { newId } from '@/lib/ids'
 import { toCents } from '@/lib/money'
 import { writeAudit } from '@/lib/audit'
-import { invoiceOpenBalance, recomputeInvoiceStatus } from '@/lib/ledger'
+import { invoiceOpenBalance } from '@/lib/ledger'
 
+// Admin SENDS a payment. It is not on the ledger yet — vendor must mark
+// received before the allocations apply and the ledger balance moves.
 type AllocationInput = { invoice_id: string; amount: string | number }
 
 export async function POST(req: Request) {
-  const s = await requireSession()
+  const s = await requireAdmin()
   const body = await req.json().catch(() => ({}))
   const amount = toCents(body.amount)
   const paidOn = body.paid_on ? new Date(String(body.paid_on)) : new Date()
@@ -18,7 +20,7 @@ export async function POST(req: Request) {
 
   if (amount <= 0) return NextResponse.json({ error: 'Amount must be > 0' }, { status: 400 })
 
-  // Validate + clamp allocations against current open balances
+  // Validate + clamp allocations against current open balances (received-only)
   let totalAlloc = 0
   const cleanAllocs: { invoiceId: string; amountCents: number }[] = []
   for (const a of allocations) {
@@ -35,7 +37,6 @@ export async function POST(req: Request) {
   }
 
   const id = newId('pay')
-  const now = new Date()
 
   db.insert(schema.payments).values({
     id,
@@ -43,11 +44,10 @@ export async function POST(req: Request) {
     paidOn,
     refNote: ref,
     recordedBy: s.userId,
-    status: 'approved',
-    approvedBy: s.userId,
-    approvedAt: now,
+    status: 'sent',
   }).run()
 
+  // Allocations are written now but only "count" once the payment is received.
   for (const a of cleanAllocs) {
     db.insert(schema.paymentAllocations).values({
       id: newId('pa'),
@@ -55,14 +55,13 @@ export async function POST(req: Request) {
       invoiceId: a.invoiceId,
       amountCents: a.amountCents,
     }).run()
-    recomputeInvoiceStatus(a.invoiceId)
   }
 
   await writeAudit({
     actor: s.userId,
     entityType: 'payment',
     entityId: id,
-    action: 'payment.recorded',
+    action: 'payment.sent',
     payload: {
       amount, paidOn, ref,
       allocations: cleanAllocs,
@@ -74,6 +73,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     id,
+    status: 'sent',
     allocated: totalAlloc,
     unallocatedCredit: amount - totalAlloc,
   })
