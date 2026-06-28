@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { fromCents } from '@/lib/money'
-import { RefreshBatchButton } from './refresh-button'
+import { BatchLineEditor, type BatchLine } from './line-editor'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,12 +25,38 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
   const items = db.select().from(schema.orderItems).where(eq(schema.orderItems.batchId, id)).all()
   const orderNums = [...new Set(items.map(i => i.orderNumber))]
   const orders = orderNums.length
-    ? db.select().from(schema.orders).all().filter(o => orderNums.includes(o.orderNumber))
+    ? db.select().from(schema.orders).where(inArray(schema.orders.orderNumber, orderNums)).all()
     : []
   const orderMap = new Map(orders.map(o => [o.orderNumber, o]))
+
+  const skuList = [...new Set(items.map(i => i.sku).filter(Boolean))]
+  const skuRows = skuList.length
+    ? db.select().from(schema.skus).where(inArray(schema.skus.sku, skuList)).all()
+    : []
+  const skuMap = new Map(skuRows.map(r => [r.sku, r]))
+
   const invoice = batch.invoiceId
     ? db.select().from(schema.invoices).where(eq(schema.invoices.id, batch.invoiceId)).get()
     : null
+
+  const initialLines: BatchLine[] = items.map(it => {
+    const sku = skuMap.get(it.sku)
+    const o = orderMap.get(it.orderNumber)
+    // For invoiced batches, prefer the locked invoice line price; otherwise use the live SKU DB.
+    const baseCost = sku ? (sku.baseCostCents / 100).toFixed(2) : (it.costOfGoodsCents / 100).toFixed(2)
+    const shippingAddon = sku ? (sku.shippingAddonCents / 100).toFixed(2) : '0.00'
+    return {
+      orderItemId: it.id,
+      orderNumber: it.orderNumber,
+      urgent: !!o?.urgent,
+      sku: it.sku,
+      name: it.name,
+      qty: it.qty,
+      baseCost,
+      shippingAddon,
+      skuInDb: !!sku,
+    }
+  })
 
   return (
     <div className="space-y-3">
@@ -40,52 +66,31 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
           <div className="text-[13px] text-slate-600 mt-0.5 flex items-center gap-2">
             <span>Created {new Date(batch.createdAt).toLocaleString()}</span>
             <span className="text-slate-400">·</span>
+            {pill(batch.source === 'ss_label_sync' ? 'SS labels' : 'Manual', 'slate')}
+            {batch.labelFetchAt && (
+              <>
+                <span className="text-slate-400">·</span>
+                <span className="text-[12px]">Fetched {new Date(batch.labelFetchAt).toLocaleString()}</span>
+              </>
+            )}
+            <span className="text-slate-400">·</span>
             {pill(batch.status.replace('_', ' '), batch.status === 'invoiced' ? 'emerald' : batch.status === 'shipped' ? 'blue' : 'slate')}
             {invoice && (
               <>
                 <span className="text-slate-400">·</span>
                 <span className="font-mono text-slate-900">{invoice.id}</span>
-                <span className="font-medium text-slate-900">{fromCents(invoice.totalCents)}</span>
+                <span className="font-medium text-slate-900 tabular-nums">{fromCents(invoice.totalCents)}</span>
               </>
             )}
           </div>
         </div>
-        <RefreshBatchButton batchId={batch.id} />
       </div>
-      <div className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
-        <table className="w-full text-[13px] border-collapse">
-          <thead>
-            <tr className="bg-slate-800 text-slate-100 text-[11px] uppercase tracking-wider">
-              <th className="px-3 py-2 text-left font-semibold w-28">Order</th>
-              <th className="px-3 py-2 text-left font-semibold">Customer</th>
-              <th className="px-3 py-2 text-left font-semibold w-32">SKU</th>
-              <th className="px-3 py-2 text-left font-semibold">Item</th>
-              <th className="px-3 py-2 text-right font-semibold w-16">Qty</th>
-              <th className="px-3 py-2 text-left font-semibold w-28">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(it => {
-              const o = orderMap.get(it.orderNumber)
-              return (
-                <tr key={it.id} className={`border-t border-slate-200 hover:bg-slate-50 ${o?.urgent ? 'border-l-2 border-l-red-500' : ''}`}>
-                  <td className="px-3 py-1.5">
-                    <span className="font-mono font-semibold">#{it.orderNumber}</span>
-                    {o?.urgent && <span className="ml-1.5">{pill('URG', 'red')}</span>}
-                  </td>
-                  <td className="px-3 py-1.5 text-slate-700">{o ? [o.firstName, o.lastName].filter(Boolean).join(' ') : '—'}</td>
-                  <td className="px-3 py-1.5 text-slate-500 font-mono text-[11px]">{it.sku || '—'}</td>
-                  <td className="px-3 py-1.5 text-slate-700">{it.name}</td>
-                  <td className="px-3 py-1.5 text-right text-slate-700 tabular-nums">×{it.qty}</td>
-                  <td className="px-3 py-1.5">
-                    {it.status === 'shipped' ? pill('Shipped', 'emerald') : it.status === 'batched' ? pill('Batched', 'blue') : pill(it.status, 'slate')}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <BatchLineEditor
+        batchId={batch.id}
+        initialLines={initialLines}
+        invoiceId={invoice?.id ?? null}
+        invoiceTotalCents={invoice?.totalCents ?? null}
+      />
     </div>
   )
 }

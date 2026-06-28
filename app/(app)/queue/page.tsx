@@ -44,6 +44,7 @@ export default async function QueuePage() {
     notes: o.notes,
     urgent: o.urgent,
     needsMerge: mergeEmails.has(o.email),
+    ssVerifyStatus: o.ssVerifyStatus,
     items: items
       .filter(i => i.orderNumber === o.orderNumber)
       .map(i => ({

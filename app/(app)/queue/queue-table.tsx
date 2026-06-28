@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { PullOrdersDialog } from './pull-dialog'
 import { NotesCell } from './notes-cell'
@@ -31,14 +30,30 @@ export type QueueOrder = {
   notes: string
   urgent: boolean
   needsMerge: boolean
+  ssVerifyStatus: 'unverified' | 'verified' | 'email_matched' | 'not_found' | 'error'
   items: QueueItem[]
+}
+
+function VerifyPill({ status }: { status: QueueOrder['ssVerifyStatus'] }) {
+  const map: Record<QueueOrder['ssVerifyStatus'], { label: string; cls: string }> = {
+    unverified: { label: 'Not checked', cls: 'bg-slate-200 text-slate-700 border-slate-300' },
+    verified: { label: 'In SS', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+    email_matched: { label: 'Email-matched', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
+    not_found: { label: 'Not in SS', cls: 'bg-red-100 text-red-900 border-red-300' },
+    error: { label: 'Lookup error', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
+  }
+  const it = map[status]
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border ${it.cls}`}>
+      {it.label}
+    </span>
+  )
 }
 
 export function QueueTable({ orders }: { orders: QueueOrder[] }) {
   const router = useRouter()
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [pushing, setPushing] = useState(false)
   const [filter, setFilter] = useState('')
+  const [verifying, setVerifying] = useState(false)
   const [modalOrder, setModalOrder] = useState<OrderModalData | null>(null)
 
   const filtered = useMemo(() => {
@@ -56,33 +71,6 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
       ),
     )
   }, [orders, filter])
-
-  const allItemIds = useMemo(() => filtered.flatMap(o => o.items.map(i => i.id)), [filtered])
-  const allChecked = allItemIds.length > 0 && allItemIds.every(id => selected.has(id))
-  const someChecked = !allChecked && allItemIds.some(id => selected.has(id))
-
-  function toggleItem(id: string, on: boolean) {
-    const next = new Set(selected)
-    on ? next.add(id) : next.delete(id)
-    setSelected(next)
-  }
-  function toggleOrder(o: QueueOrder, on: boolean) {
-    const next = new Set(selected)
-    o.items.forEach(i => (on ? next.add(i.id) : next.delete(i.id)))
-    setSelected(next)
-  }
-  function toggleAll(on: boolean) {
-    const next = new Set(selected)
-    if (on) allItemIds.forEach(id => next.add(id))
-    else allItemIds.forEach(id => next.delete(id))
-    setSelected(next)
-  }
-  function orderState(o: QueueOrder): 'none' | 'partial' | 'all' {
-    const inSel = o.items.filter(i => selected.has(i.id)).length
-    if (inSel === 0) return 'none'
-    if (inSel === o.items.length) return 'all'
-    return 'partial'
-  }
 
   function openModal(o: QueueOrder) {
     setModalOrder({
@@ -102,67 +90,43 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
     })
   }
 
-  const summary = useMemo(() => {
-    const ords = new Set<string>()
-    for (const o of orders) {
-      for (const i of o.items) if (selected.has(i.id)) ords.add(o.orderNumber)
-    }
-    return { items: selected.size, orders: ords.size }
-  }, [selected, orders])
-
-  async function push() {
-    if (selected.size === 0) return
-    setPushing(true)
-    const r = await fetch('/api/batches/push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemIds: [...selected] }),
-    })
-    setPushing(false)
+  async function verifyAll() {
+    setVerifying(true)
+    const r = await fetch('/api/orders/verify-ss', { method: 'POST' })
+    setVerifying(false)
     if (!r.ok) {
-      const { error } = await r.json().catch(() => ({ error: 'Push failed' }))
-      toast.error(error || 'Push failed')
+      const { error } = await r.json().catch(() => ({ error: 'Verify failed' }))
+      toast.error(error || 'Verify failed')
       return
     }
-    const data = await r.json()
-    toast.success(`Batch ${data.batchId} created — ${data.tagged}/${data.total} tagged in ShipStation`)
-    setSelected(new Set())
+    const d = await r.json()
+    toast.success(`Checked ${d.checked} orders — ${d.verified} found, ${d.emailMatched} email-matched, ${d.notFound} not in SS, ${d.errors} errors`)
     router.refresh()
   }
+
+  const unverifiedCount = orders.filter(o => o.ssVerifyStatus === 'unverified').length
 
   return (
     <div className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 px-3 py-2 bg-slate-100 border-b border-slate-300">
         <div className="flex items-center gap-3 flex-1">
-          <div className="flex items-center gap-2 pl-1">
-            <Checkbox
-              checked={allChecked}
-              indeterminate={someChecked}
-              onCheckedChange={v => toggleAll(!!v)}
-              aria-label="Select all"
-            />
-            <span className="text-[12px] text-slate-600 font-medium select-none">Select all</span>
-          </div>
-          <div className="w-px h-5 bg-slate-300" />
           <Input
             value={filter}
             onChange={e => setFilter(e.target.value)}
             placeholder="Filter order#, email, customer, SKU, notes…"
             className="h-7 max-w-xs text-[13px] bg-white"
           />
-          <div className="text-[12px] text-slate-600">
-            {summary.items > 0 ? (
-              <span><span className="font-semibold text-slate-900">{summary.items}</span> item{summary.items === 1 ? '' : 's'} · {summary.orders} order{summary.orders === 1 ? '' : 's'}</span>
-            ) : (
-              <span className="text-slate-500">Nothing selected</span>
-            )}
-          </div>
+          {unverifiedCount > 0 && (
+            <span className="text-[12px] text-slate-500">
+              <span className="font-semibold text-slate-900">{unverifiedCount}</span> not yet verified against ShipStation
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
           <PullOrdersDialog />
-          <Button onClick={push} disabled={selected.size === 0 || pushing} size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-            {pushing ? 'Pushing…' : `Push${selected.size > 0 ? ` ${summary.orders}` : ''} to ShipStation`}
+          <Button onClick={verifyAll} disabled={verifying || orders.length === 0} size="sm" variant="outline">
+            {verifying ? 'Verifying…' : 'Verify against ShipStation'}
           </Button>
         </div>
       </div>
@@ -171,8 +135,8 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
       <table className="w-full text-[13px] border-collapse">
         <thead>
           <tr className="bg-slate-800 text-slate-100 text-[11px] uppercase tracking-wider">
-            <th className="w-8 px-3 py-2 text-left"></th>
-            <th className="px-3 py-2 text-left font-semibold w-36">Order</th>
+            <th className="px-3 py-2 text-left font-semibold w-44">Order</th>
+            <th className="px-3 py-2 text-left font-semibold w-32">SS</th>
             <th className="px-3 py-2 text-left font-semibold">Customer</th>
             <th className="px-3 py-2 text-left font-semibold">Email</th>
             <th className="px-3 py-2 text-left font-semibold">Notes</th>
@@ -192,98 +156,80 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
               </td>
             </tr>
           )}
-          {filtered.map(o => {
-            const st = orderState(o)
-            const sel = st !== 'none'
-            return (
-              <Fragment key={o.orderNumber}>
-                <tr className={`border-t-2 border-slate-400 ${sel ? 'bg-emerald-200/70' : 'bg-slate-200'} ${o.urgent ? 'border-l-4 border-l-red-600' : ''}`}>
-                  <td className="px-3 py-1.5 align-middle">
-                    <Checkbox
-                      checked={st === 'all'}
-                      indeterminate={st === 'partial'}
-                      onCheckedChange={v => toggleOrder(o, !!v)}
-                    />
+          {filtered.map(o => (
+            <Fragment key={o.orderNumber}>
+              <tr className={`border-t-2 border-slate-400 bg-slate-200 ${o.urgent ? 'border-l-4 border-l-red-600' : ''}`}>
+                <td className="px-3 py-1.5 align-middle">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openModal(o)}
+                      className="font-mono font-semibold text-slate-900 hover:text-emerald-700 hover:underline cursor-pointer"
+                      title="Open notes & item status"
+                    >
+                      #{o.orderNumber}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openModal(o)}
+                      className="text-slate-500 hover:text-emerald-700 p-0.5 rounded hover:bg-white"
+                      title="Open notes & item status"
+                      aria-label="Edit order notes"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    {o.urgent && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-red-600 text-white">
+                        Urgent
+                      </span>
+                    )}
+                    {o.needsMerge && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300">
+                        Merge?
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-1.5 align-middle"><VerifyPill status={o.ssVerifyStatus} /></td>
+                <td className="px-3 py-1.5 align-middle text-slate-800">{o.customer || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-1.5 align-middle text-slate-600">{o.email}</td>
+                <td className="px-3 py-1 align-middle text-slate-600">
+                  <NotesCell orderNumber={o.orderNumber} initial={o.notes} />
+                </td>
+                <td className="px-3 py-1.5 align-middle text-right tabular-nums"></td>
+                <td className="px-3 py-1.5 align-middle text-right tabular-nums"></td>
+              </tr>
+              {o.items.map(i => (
+                <tr key={i.id} className="border-t border-slate-200 bg-white hover:bg-slate-50">
+                  <td className="px-3 py-1 align-middle"></td>
+                  <td className="px-3 py-1 align-middle"></td>
+                  <td colSpan={3} className="px-3 py-1 align-middle text-slate-700 pl-8">
+                    <span className="font-mono text-[11px] text-slate-500 mr-2 inline-block w-24 align-middle">
+                      {i.sku || <span className="text-slate-400">no-sku</span>}
+                    </span>
+                    <span className="align-middle">{i.name}</span>
+                    {i.skuMissing && (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-300 align-middle">
+                        SKU not in DB
+                      </span>
+                    )}
+                    {i.statusFlag && (
+                      <span className="ml-2 align-middle">
+                        <ItemStatusPill flag={i.statusFlag} pendingUntil={i.pendingUntil} />
+                      </span>
+                    )}
+                    {i.itemNotes && (
+                      <span className="ml-2 text-[11px] text-slate-500 italic align-middle" title={i.itemNotes}>
+                        “{i.itemNotes.length > 60 ? i.itemNotes.slice(0, 57) + '…' : i.itemNotes}”
+                      </span>
+                    )}
                   </td>
-                  <td className="px-3 py-1.5 align-middle">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => openModal(o)}
-                        className="font-mono font-semibold text-slate-900 hover:text-emerald-700 hover:underline cursor-pointer"
-                        title="Open notes & item status"
-                      >
-                        #{o.orderNumber}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openModal(o)}
-                        className="text-slate-500 hover:text-emerald-700 p-0.5 rounded hover:bg-white"
-                        title="Open notes & item status"
-                        aria-label="Edit order notes"
-                      >
-                        <Pencil className="size-3.5" />
-                      </button>
-                      {o.urgent && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-red-600 text-white">
-                          Urgent
-                        </span>
-                      )}
-                      {o.needsMerge && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300">
-                          Merge?
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-1.5 align-middle text-slate-800">{o.customer || <span className="text-slate-400">—</span>}</td>
-                  <td className="px-3 py-1.5 align-middle text-slate-600">{o.email}</td>
-                  <td className="px-3 py-1 align-middle text-slate-600">
-                    <NotesCell orderNumber={o.orderNumber} initial={o.notes} />
-                  </td>
-                  <td className="px-3 py-1.5 align-middle text-right tabular-nums"></td>
-                  <td className="px-3 py-1.5 align-middle text-right tabular-nums"></td>
+                  <td className="px-3 py-1 align-middle text-right text-slate-700 tabular-nums">{i.qty}</td>
+                  <td className="px-3 py-1 align-middle text-right text-slate-700 tabular-nums">{i.unitPrice}</td>
                 </tr>
-                {o.items.map(i => {
-                  const checked = selected.has(i.id)
-                  return (
-                    <tr key={i.id} className={`border-t border-slate-200 ${checked ? 'bg-emerald-50' : 'bg-white hover:bg-slate-50'}`}>
-                      <td className="pl-8 pr-3 py-1 align-middle">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={v => toggleItem(i.id, !!v)}
-                        />
-                      </td>
-                      <td className="px-3 py-1 align-middle"></td>
-                      <td colSpan={3} className="px-3 py-1 align-middle text-slate-700">
-                        <span className="font-mono text-[11px] text-slate-500 mr-2 inline-block w-24 align-middle">
-                          {i.sku || <span className="text-slate-400">no-sku</span>}
-                        </span>
-                        <span className="align-middle">{i.name}</span>
-                        {i.skuMissing && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-300 align-middle">
-                            SKU not in DB
-                          </span>
-                        )}
-                        {i.statusFlag && (
-                          <span className="ml-2 align-middle">
-                            <ItemStatusPill flag={i.statusFlag} pendingUntil={i.pendingUntil} />
-                          </span>
-                        )}
-                        {i.itemNotes && (
-                          <span className="ml-2 text-[11px] text-slate-500 italic align-middle" title={i.itemNotes}>
-                            “{i.itemNotes.length > 60 ? i.itemNotes.slice(0, 57) + '…' : i.itemNotes}”
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1 align-middle text-right text-slate-700 tabular-nums">{i.qty}</td>
-                      <td className="px-3 py-1 align-middle text-right text-slate-700 tabular-nums">{i.unitPrice}</td>
-                    </tr>
-                  )
-                })}
-              </Fragment>
-            )
-          })}
+              ))}
+            </Fragment>
+          ))}
         </tbody>
       </table>
 
