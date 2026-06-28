@@ -54,10 +54,20 @@ export async function createInvoiceForBatch(batchId: string, actor?: string): Pr
 
   for (const it of items) {
     const sku = skuMap.get(it.sku)
-    if (!sku) {
-      warnings.push(`SKU "${it.sku}" not in DB — invoiced at $0; set price and re-issue if needed.`)
+    // Authority for unit cost:
+    //   1. SKU DB (authoritative once set)
+    //   2. order_item.costOfGoodsCents (captured from CSV at pull time)
+    //   3. 0 + warning (truly unknown)
+    let unitCost: number
+    if (sku) {
+      unitCost = sku.baseCostCents
+    } else if (it.costOfGoodsCents > 0) {
+      unitCost = it.costOfGoodsCents
+      warnings.push(`SKU "${it.sku}" not in DB — used CSV Cost of Goods (${fromCents(unitCost)}). Consider adding to /settings/skus.`)
+    } else {
+      unitCost = 0
+      warnings.push(`SKU "${it.sku}" not in DB and no CSV cost — invoiced at $0; set price and re-issue.`)
     }
-    const unitCost = sku?.baseCostCents ?? 0
     // Handling/shipping is rule-based at invoice time (not stored on SKU):
     // any line whose unit cost is below the threshold carries a per-item handling fee.
     const handlingPerItem = computeHandlingPerItem(unitCost)
