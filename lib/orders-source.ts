@@ -104,19 +104,37 @@ export function parseXlsx(buf: Buffer): OrderRow[] {
 
 export async function readGoogleSheet(sheetId: string, tab: string): Promise<OrderRow[]> {
   const credPath = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  if (!credPath) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON not set in env')
-  const auth = new google.auth.GoogleAuth({
-    keyFile: credPath,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  })
-  const sheets = google.sheets({ version: 'v4', auth })
-  const resp = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: tab,
-    valueRenderOption: 'UNFORMATTED_VALUE',
-  })
-  const rows = (resp.data.values || []) as string[][]
-  return rowsToOrders(rows.map(r => r.map(c => (c === undefined || c === null ? '' : String(c)))))
+  if (credPath) {
+    // Service-account path (private sheets)
+    const auth = new google.auth.GoogleAuth({
+      keyFile: credPath,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    })
+    const sheets = google.sheets({ version: 'v4', auth })
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: tab,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    })
+    const rows = (resp.data.values || []) as string[][]
+    return rowsToOrders(rows.map(r => r.map(c => (c === undefined || c === null ? '' : String(c)))))
+  }
+
+  // Fallback: public CSV export. Requires the sheet to be "Anyone with the link → Viewer".
+  // Uses gviz so a tab name (or gid) works, vs the /export?format=csv that only takes gid.
+  const url =
+    `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}` +
+    `/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`
+  const r = await fetch(url, { redirect: 'follow' })
+  if (!r.ok) {
+    throw new Error(`Public sheet fetch failed (${r.status}). Make sure the sheet is shared "Anyone with the link → Viewer", or set GOOGLE_SERVICE_ACCOUNT_JSON for private sheets.`)
+  }
+  const text = await r.text()
+  if (text.trim().startsWith('<')) {
+    // Google returned an HTML error page (e.g. login wall) instead of CSV.
+    throw new Error('Google returned HTML instead of CSV — the sheet probably isn\'t public. Share it as "Anyone with the link → Viewer".')
+  }
+  return parseCsv(text)
 }
 
 export function detectUrgent(notes: string): boolean {
