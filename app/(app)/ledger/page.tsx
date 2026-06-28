@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc, sql } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { fromCents } from '@/lib/money'
 import { getLedger } from '@/lib/ledger'
@@ -12,7 +12,7 @@ export default async function LedgerPage() {
   const payments = db
     .select()
     .from(schema.payments)
-    .where(eq(schema.payments.status, 'approved'))
+    .where(sql`${schema.payments.status} IN ('received', 'approved')`)
     .orderBy(desc(schema.payments.paidOn))
     .all()
 

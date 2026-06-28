@@ -79,6 +79,7 @@ export default async function BatchesPage() {
             )}
             {batches.map(b => {
               const inv = b.invoiceId ? invMap.get(b.invoiceId) : undefined
+              const statusContent = statusPill(b.status)
               return (
                 <tr key={b.id} className="border-t border-slate-200 hover:bg-slate-50">
                   <td className="px-3 py-1.5 font-mono font-semibold">
@@ -86,8 +87,12 @@ export default async function BatchesPage() {
                   </td>
                   <td className="px-3 py-1.5 text-slate-600 tabular-nums">{new Date(b.createdAt).toLocaleString()}</td>
                   <td className="px-3 py-1.5 text-slate-600 text-[12px]">{b.source === 'ss_label_sync' ? 'SS labels' : 'Manual'}</td>
-                  <td className="px-3 py-1.5">{statusPill(b.status)}</td>
-                  <td className="px-3 py-1.5 text-slate-600 font-mono">{inv?.id || <span className="text-slate-400">—</span>}</td>
+                  <td className="px-3 py-1.5">
+                    {inv ? <Link href={`/invoices/${inv.id}`} className="hover:opacity-80">{statusContent}</Link> : statusContent}
+                  </td>
+                  <td className="px-3 py-1.5 text-slate-600 font-mono">
+                    {inv ? <Link href={`/invoices/${inv.id}`} className="hover:text-emerald-700 hover:underline">{inv.id}</Link> : <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="px-3 py-1.5 text-right tabular-nums font-medium">{inv ? fromCents(inv.totalCents) : <span className="text-slate-400">—</span>}</td>
                 </tr>
               )

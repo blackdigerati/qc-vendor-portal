@@ -132,23 +132,35 @@ function SendPaymentImpl({ invoices }: { invoices: OpenInv[] }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map(inv => (
-                    <tr key={inv.id} className="border-t border-slate-100">
-                      <td className="px-3 py-1 font-mono">{inv.id}</td>
-                      <td className="px-3 py-1 text-right tabular-nums text-slate-600">{fromCents(inv.openCents)}</td>
-                      <td className="px-3 py-1 text-right">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={alloc[inv.id] || ''}
-                          onChange={e => setAlloc({ ...alloc, [inv.id]: e.target.value })}
-                          className="h-7 text-right tabular-nums"
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  {invoices.map(inv => {
+                    const openDollars = (inv.openCents / 100).toFixed(2)
+                    return (
+                      <tr key={inv.id} className="border-t border-slate-100">
+                        <td className="px-3 py-1 font-mono">{inv.id}</td>
+                        <td className="px-3 py-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setAlloc({ ...alloc, [inv.id]: openDollars })}
+                            className="tabular-nums text-slate-600 hover:text-emerald-700 hover:underline"
+                            title="Click to apply full open amount"
+                          >
+                            {fromCents(inv.openCents)}
+                          </button>
+                        </td>
+                        <td className="px-3 py-1 text-right">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={alloc[inv.id] || ''}
+                            onChange={e => setAlloc({ ...alloc, [inv.id]: e.target.value })}
+                            className="h-7 text-right tabular-nums"
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             )}

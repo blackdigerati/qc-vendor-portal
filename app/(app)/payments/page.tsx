@@ -57,24 +57,31 @@ export default async function PaymentsPage() {
             <tbody>
               {pending.map(p => {
                 const myAllocs = allocsByPayment.get(p.id) || []
+                const allocSum = myAllocs.reduce((a, x) => a + x.amountCents, 0)
+                const arrears = p.amountCents - allocSum
                 return (
                   <tr key={p.id} className="border-t border-slate-200 align-top">
                     <td className="px-3 py-1.5 text-slate-600 tabular-nums">{p.paidOn.toLocaleDateString()}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{fromCents(p.amountCents)}</td>
                     <td className="px-3 py-1.5">{p.refNote || <span className="text-slate-400">—</span>}</td>
                     <td className="px-3 py-1.5 text-slate-700">
-                      {myAllocs.length === 0 ? (
-                        <span className="text-slate-400">— (held as credit)</span>
-                      ) : (
-                        <div className="space-y-0.5">
-                          {myAllocs.map(a => (
-                            <div key={a.id} className="text-[12px]">
-                              <span className="font-mono text-slate-700">{a.invoiceId}</span>
-                              <span className="text-slate-400 ml-2 tabular-nums">{fromCents(a.amountCents)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="space-y-0.5">
+                        {myAllocs.map(a => (
+                          <div key={a.id} className="text-[12px]">
+                            <span className="font-mono text-slate-700">{a.invoiceId}</span>
+                            <span className="text-slate-400 ml-2 tabular-nums">{fromCents(a.amountCents)}</span>
+                          </div>
+                        ))}
+                        {arrears > 0 && (
+                          <div className="text-[12px] text-emerald-700 font-medium">
+                            Arrears / account credit
+                            <span className="ml-2 tabular-nums">{fromCents(arrears)}</span>
+                          </div>
+                        )}
+                        {myAllocs.length === 0 && arrears === 0 && (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-1.5 text-right">
                       <MarkReceivedButton paymentId={p.id} amountCents={p.amountCents} />
@@ -116,18 +123,23 @@ export default async function PaymentsPage() {
                   <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{fromCents(p.amountCents)}</td>
                   <td className="px-3 py-1.5">{p.refNote || <span className="text-slate-400">—</span>}</td>
                   <td className="px-3 py-1.5 text-slate-700">
-                    {myAllocs.length === 0 ? (
-                      <span className="text-slate-400">— (account credit)</span>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {myAllocs.map(a => (
-                          <div key={a.id} className="text-[12px]">
-                            <span className="font-mono text-slate-700">{a.invoiceId}</span>
-                            <span className="text-slate-400 ml-2 tabular-nums">{fromCents(a.amountCents)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <div className="space-y-0.5">
+                      {myAllocs.map(a => (
+                        <div key={a.id} className="text-[12px]">
+                          <span className="font-mono text-slate-700">{a.invoiceId}</span>
+                          <span className="text-slate-400 ml-2 tabular-nums">{fromCents(a.amountCents)}</span>
+                        </div>
+                      ))}
+                      {credit > 0 && (
+                        <div className="text-[12px] text-emerald-700 font-medium">
+                          Arrears / account credit
+                          <span className="ml-2 tabular-nums">{fromCents(credit)}</span>
+                        </div>
+                      )}
+                      {myAllocs.length === 0 && credit === 0 && (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums">
                     {credit > 0 ? <span className="text-emerald-700 font-medium">{fromCents(credit)}</span> : <span className="text-slate-400">—</span>}

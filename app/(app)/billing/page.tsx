@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { desc } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { fromCents } from '@/lib/money'
@@ -65,8 +66,12 @@ export default async function BillingPage() {
             )}
             {rows.map(inv => (
               <tr key={inv.id} className="border-t border-slate-200 hover:bg-slate-50">
-                <td className="px-3 py-1.5 font-mono font-semibold">{inv.id}</td>
-                <td className="px-3 py-1.5 text-slate-600 font-mono">{inv.batchId}</td>
+                <td className="px-3 py-1.5 font-mono font-semibold">
+                  <Link href={`/invoices/${inv.id}`} className="text-slate-900 hover:text-emerald-700 hover:underline">{inv.id}</Link>
+                </td>
+                <td className="px-3 py-1.5 text-slate-600 font-mono">
+                  <Link href={`/batches/${inv.batchId}`} className="hover:text-emerald-700 hover:underline">{inv.batchId}</Link>
+                </td>
                 <td className="px-3 py-1.5 text-slate-600 tabular-nums">{new Date(inv.createdAt).toLocaleDateString()}</td>
                 <td className="px-3 py-1.5">{statusPill(inv.status)}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{fromCents(inv.totalCents)}</td>

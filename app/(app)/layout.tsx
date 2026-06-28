@@ -9,8 +9,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isAdmin = s.role === 'admin'
   const nav: { href: string; label: string; adminOnly?: boolean }[] = [
     { href: '/queue', label: 'Queue' },
-    { href: '/batches', label: 'Batches' },
     { href: '/merge-report', label: 'Merge' },
+    { href: '/batches', label: 'Batches' },
     { href: '/billing', label: 'Billing' },
     { href: '/ledger', label: 'Ledger' },
     { href: '/payments', label: 'Payments' },
