@@ -50,7 +50,15 @@ function VerifyPill({ status }: { status: QueueOrder['ssVerifyStatus'] }) {
   )
 }
 
-export function QueueTable({ orders }: { orders: QueueOrder[] }) {
+export function QueueTable({
+  orders,
+  defaultSheetId = '',
+  defaultSheetTab = 'Orders',
+}: {
+  orders: QueueOrder[]
+  defaultSheetId?: string
+  defaultSheetTab?: string
+}) {
   const router = useRouter()
   const [filter, setFilter] = useState('')
   const [verifying, setVerifying] = useState(false)
@@ -124,7 +132,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
           )}
         </div>
         <div className="flex gap-2">
-          <PullOrdersDialog />
+          <PullOrdersDialog defaultSheetId={defaultSheetId} defaultSheetTab={defaultSheetTab} />
           <Button onClick={verifyAll} disabled={verifying || orders.length === 0} size="sm" variant="outline">
             {verifying ? 'Verifying…' : 'Verify against ShipStation'}
           </Button>

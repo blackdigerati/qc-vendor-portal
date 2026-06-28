@@ -77,7 +77,11 @@ export default async function QueuePage() {
           </p>
         </div>
       </div>
-      <QueueTable orders={data} />
+      <QueueTable
+        orders={data}
+        defaultSheetId={process.env.GOOGLE_SHEET_ID || ''}
+        defaultSheetTab={process.env.GOOGLE_SHEET_TAB || 'Orders'}
+      />
     </div>
   )
 }
