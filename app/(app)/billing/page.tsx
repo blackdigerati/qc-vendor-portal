@@ -2,7 +2,6 @@ import { desc } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { fromCents } from '@/lib/money'
 import { getLedger, invoiceOpenBalance } from '@/lib/ledger'
-import { getSession } from '@/lib/auth'
 import { RecordPaymentButton } from './record-payment'
 
 export const dynamic = 'force-dynamic'
@@ -17,8 +16,6 @@ function statusPill(s: string) {
 }
 
 export default async function BillingPage() {
-  const session = await getSession()
-  const isAdmin = session.role === 'admin'
   const ledger = getLedger()
   const invoices = db.select().from(schema.invoices).orderBy(desc(schema.invoices.createdAt)).all()
   const rows = invoices.map(inv => ({ ...inv, openCents: invoiceOpenBalance(inv.id) }))
@@ -36,7 +33,7 @@ export default async function BillingPage() {
             )}
           </p>
         </div>
-        <RecordPaymentButton invoices={openInvoiceOptions} isAdmin={isAdmin} />
+        <RecordPaymentButton invoices={openInvoiceOptions} />
       </div>
 
       {/* Summary tiles */}

@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/merge-report', label: 'Merge' },
     { href: '/billing', label: 'Billing' },
     { href: '/ledger', label: 'Ledger' },
-    { href: '/payments', label: 'Payments', adminOnly: true },
+    { href: '/payments', label: 'Payments' },
     { href: '/settings/skus', label: 'Settings', adminOnly: true },
   ]
   return (
