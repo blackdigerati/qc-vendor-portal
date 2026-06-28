@@ -6,6 +6,11 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { fromCents } from '@/lib/money'
+import {
+  computeHandlingPerItem,
+  HANDLING_PER_ITEM_CENTS,
+  SHIPPING_THRESHOLD_CENTS,
+} from '@/lib/billing-rules'
 
 export type BatchLine = {
   orderItemId: string
@@ -14,8 +19,7 @@ export type BatchLine = {
   sku: string
   name: string
   qty: number
-  baseCost: string      // dollars, two decimals
-  shippingAddon: string
+  baseCost: string      // dollars, two decimals (editable)
   skuInDb: boolean
 }
 
@@ -45,14 +49,20 @@ export function BatchLineEditor({
     return [...m.entries()]
   }, [lines])
 
-  function totalForLine(l: BatchLine): number {
-    const c = parseFloat(l.baseCost) || 0
-    const s = parseFloat(l.shippingAddon) || 0
-    return Math.round((c + s) * l.qty * 100)
+  function lineNumbers(l: BatchLine) {
+    const cogCents = Math.round((parseFloat(l.baseCost) || 0) * 100)
+    const handlingPerItemCents = computeHandlingPerItem(cogCents)
+    const totalCents = (cogCents + handlingPerItemCents) * l.qty
+    return { cogCents, handlingPerItemCents, totalCents }
   }
 
   const grandTotalCents = useMemo(
-    () => lines.reduce((acc, l) => acc + totalForLine(l), 0),
+    () => lines.reduce((acc, l) => acc + lineNumbers(l).totalCents, 0),
+    [lines],
+  )
+
+  const totalHandlingCents = useMemo(
+    () => lines.reduce((acc, l) => acc + lineNumbers(l).handlingPerItemCents * l.qty, 0),
     [lines],
   )
 
@@ -71,7 +81,6 @@ export function BatchLineEditor({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         baseCost: line.baseCost,
-        shippingAddon: line.shippingAddon,
         description: line.name,
       }),
     })
@@ -81,15 +90,13 @@ export function BatchLineEditor({
       toast.error(error || `SKU ${line.sku} save failed`)
       return
     }
-    // Mirror the saved values to any other lines with the same SKU
+    // Mirror the saved COG to any other lines with the same SKU
     setLines(prev =>
       prev.map(l =>
-        l.sku === line.sku
-          ? { ...l, baseCost: line.baseCost, shippingAddon: line.shippingAddon, skuInDb: true }
-          : l,
+        l.sku === line.sku ? { ...l, baseCost: line.baseCost, skuInDb: true } : l,
       ),
     )
-    toast.success(`Saved pricing for ${line.sku}`)
+    toast.success(`Saved COG for ${line.sku}`)
   }
 
   async function createInvoice() {
@@ -114,6 +121,12 @@ export function BatchLineEditor({
 
   return (
     <div className="space-y-3">
+      <div className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-[12px] text-slate-700">
+        <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-500 mr-2">Billing rule</span>
+        Lines with COG below <span className="font-medium tabular-nums">{fromCents(SHIPPING_THRESHOLD_CENTS)}</span> carry a{' '}
+        <span className="font-medium tabular-nums">{fromCents(HANDLING_PER_ITEM_CENTS)}</span> per-item handling charge — added at invoice time.
+      </div>
+
       <div className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
         <table className="w-full text-[13px] border-collapse">
           <thead>
@@ -122,14 +135,14 @@ export function BatchLineEditor({
               <th className="px-3 py-2 text-left font-semibold">Item</th>
               <th className="px-3 py-2 text-right font-semibold w-14">Qty</th>
               <th className="px-3 py-2 text-right font-semibold w-28">COG</th>
-              <th className="px-3 py-2 text-right font-semibold w-28">Shipping</th>
+              <th className="px-3 py-2 text-right font-semibold w-28">Handling/ea</th>
               <th className="px-3 py-2 text-right font-semibold w-28">Line Total</th>
               <th className="px-3 py-2 w-20"></th>
             </tr>
           </thead>
           <tbody>
             {grouped.map(([orderNumber, orderLines]) => {
-              const orderTotal = orderLines.reduce((acc, l) => acc + totalForLine(l), 0)
+              const orderTotal = orderLines.reduce((acc, l) => acc + lineNumbers(l).totalCents, 0)
               const urgent = orderLines[0]?.urgent
               return (
                 <Fragment key={orderNumber}>
@@ -146,8 +159,8 @@ export function BatchLineEditor({
                     <td></td>
                   </tr>
                   {orderLines.map(l => {
-                    const dirty = false // future: track per-line dirty
-                    const t = totalForLine(l)
+                    const { handlingPerItemCents, totalCents } = lineNumbers(l)
+                    const hasHandling = handlingPerItemCents > 0
                     return (
                       <tr key={l.orderItemId} className="border-t border-slate-200 bg-white hover:bg-slate-50">
                         <td className="px-3 py-1 font-mono text-[11px] text-slate-500 pl-8">{l.sku || <span className="text-slate-400">no-sku</span>}</td>
@@ -172,21 +185,16 @@ export function BatchLineEditor({
                             className="h-7 text-right tabular-nums w-24 inline-block"
                           />
                         </td>
-                        <td className="px-3 py-1 text-right">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={l.shippingAddon}
-                            disabled={readOnly}
-                            onChange={e => patchLine(l.orderItemId, { shippingAddon: e.target.value })}
-                            onBlur={() => !readOnly && saveSku(l)}
-                            className="h-7 text-right tabular-nums w-24 inline-block"
-                          />
+                        <td className="px-3 py-1 text-right tabular-nums">
+                          {hasHandling ? (
+                            <span className="text-slate-700">{fromCents(handlingPerItemCents)}</span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
                         </td>
-                        <td className="px-3 py-1 text-right tabular-nums font-medium">{fromCents(t)}</td>
+                        <td className="px-3 py-1 text-right tabular-nums font-medium">{fromCents(totalCents)}</td>
                         <td className="px-3 py-1 text-right text-[11px] text-slate-400">
-                          {savingSku === l.sku ? 'saving…' : dirty ? 'unsaved' : ''}
+                          {savingSku === l.sku ? 'saving…' : ''}
                         </td>
                       </tr>
                     )
@@ -200,6 +208,12 @@ export function BatchLineEditor({
           </tbody>
           {lines.length > 0 && (
             <tfoot>
+              <tr className="bg-slate-100 border-t border-slate-300">
+                <td colSpan={4} className="px-3 py-1.5 text-right text-[12px] text-slate-600">Handling subtotal</td>
+                <td className="px-3 py-1.5"></td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-slate-700">{fromCents(totalHandlingCents)}</td>
+                <td></td>
+              </tr>
               <tr className="bg-slate-100 border-t-2 border-slate-400">
                 <td colSpan={5} className="px-3 py-2 text-right font-semibold uppercase tracking-wider text-[11px] text-slate-700">Batch total</td>
                 <td className="px-3 py-2 text-right tabular-nums font-bold text-slate-900">{fromCents(grandTotalCents)}</td>
@@ -215,7 +229,7 @@ export function BatchLineEditor({
           {isInvoiced ? (
             <>Invoice <span className="font-mono font-semibold text-slate-900">{invoiceId}</span> already issued for {fromCents(invoiceTotalCents ?? 0)} — pricing locked.</>
           ) : (
-            <>Edit COG + Shipping per line above (changes save to the SKU DB on blur). Then create the invoice.</>
+            <>Edit COG per line (saves to SKU DB on blur). Handling auto-applies per the rule above. Eyeball the total, then create the invoice.</>
           )}
         </div>
         {!isInvoiced && (

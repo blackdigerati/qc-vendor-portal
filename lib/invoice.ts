@@ -4,6 +4,7 @@ import { newId } from './ids'
 import { writeAudit } from './audit'
 import { sendAlert } from './mailer'
 import { fromCents } from './money'
+import { computeHandlingPerItem } from './billing-rules'
 
 function nextInvoiceId(): string {
   const year = new Date().getFullYear()
@@ -57,8 +58,10 @@ export async function createInvoiceForBatch(batchId: string, actor?: string): Pr
       warnings.push(`SKU "${it.sku}" not in DB — invoiced at $0; set price and re-issue if needed.`)
     }
     const unitCost = sku?.baseCostCents ?? 0
-    const shipAddon = sku?.shippingAddonCents ?? 0
-    const lineTotal = (unitCost + shipAddon) * it.qty
+    // Handling/shipping is rule-based at invoice time (not stored on SKU):
+    // any line whose unit cost is below the threshold carries a per-item handling fee.
+    const handlingPerItem = computeHandlingPerItem(unitCost)
+    const lineTotal = (unitCost + handlingPerItem) * it.qty
     if (sku && it.costOfGoodsCents > 0 && unitCost !== it.costOfGoodsCents) {
       warnings.push(
         `Price mismatch on ${sku.sku}: SKU DB ${fromCents(unitCost)} vs CSV Cost of Goods ${fromCents(it.costOfGoodsCents)} — used DB.`,
@@ -71,7 +74,7 @@ export async function createInvoiceForBatch(batchId: string, actor?: string): Pr
       sku: it.sku,
       qty: it.qty,
       unitCostCents: unitCost,
-      shippingAddonCents: shipAddon,
+      shippingAddonCents: handlingPerItem,
       lineTotalCents: lineTotal,
     })
   }

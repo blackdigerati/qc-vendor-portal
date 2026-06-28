@@ -10,7 +10,6 @@ export default async function SkusPage() {
     sku: r.sku,
     description: r.description,
     baseCost: (r.baseCostCents / 100).toFixed(2),
-    shippingAddon: (r.shippingAddonCents / 100).toFixed(2),
     active: r.active,
   }))
   return <SkusEditor initial={data} />

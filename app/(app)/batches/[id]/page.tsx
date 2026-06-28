@@ -42,9 +42,8 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
   const initialLines: BatchLine[] = items.map(it => {
     const sku = skuMap.get(it.sku)
     const o = orderMap.get(it.orderNumber)
-    // For invoiced batches, prefer the locked invoice line price; otherwise use the live SKU DB.
+    // Prefer the SKU DB cost; fall back to the per-line CSV cost.
     const baseCost = sku ? (sku.baseCostCents / 100).toFixed(2) : (it.costOfGoodsCents / 100).toFixed(2)
-    const shippingAddon = sku ? (sku.shippingAddonCents / 100).toFixed(2) : '0.00'
     return {
       orderItemId: it.id,
       orderNumber: it.orderNumber,
@@ -53,7 +52,6 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
       name: it.name,
       qty: it.qty,
       baseCost,
-      shippingAddon,
       skuInDb: !!sku,
     }
   })
