@@ -5,6 +5,11 @@ import { fromCents } from '@/lib/money'
 
 export const dynamic = 'force-dynamic'
 
+function isoDate(d: Date | null | undefined): string | null {
+  if (!d) return null
+  return d.toISOString().slice(0, 10)
+}
+
 export default async function QueuePage() {
   const orders = db
     .select()
@@ -48,11 +53,15 @@ export default async function QueuePage() {
         qty: i.qty,
         unitPrice: fromCents(i.costOfGoodsCents),
         skuMissing: !!i.sku && !knownSkus.has(i.sku),
+        statusFlag: i.statusFlag,
+        pendingUntil: isoDate(i.pendingUntil as Date | null),
+        itemNotes: i.notes,
       })),
   }))
 
   const urgentCount = data.filter(o => o.urgent).length
   const totalMissing = data.reduce((acc, o) => acc + o.items.filter(i => i.skuMissing).length, 0)
+  const flaggedCount = data.reduce((acc, o) => acc + o.items.filter(i => i.statusFlag).length, 0)
 
   return (
     <div className="space-y-3">
@@ -62,9 +71,8 @@ export default async function QueuePage() {
           <p className="text-[13px] text-slate-600 mt-0.5">
             <span className="font-medium text-slate-900">{data.length}</span> ready to ship
             {urgentCount > 0 && <> · <span className="text-red-600 font-medium">{urgentCount} urgent</span></>}
-            {totalMissing > 0 && (
-              <> · <span className="text-amber-700 font-medium">{totalMissing} items missing SKU</span></>
-            )}
+            {flaggedCount > 0 && <> · <span className="text-amber-700 font-medium">{flaggedCount} flagged items</span></>}
+            {totalMissing > 0 && <> · <span className="text-amber-700 font-medium">{totalMissing} items missing SKU</span></>}
           </p>
         </div>
       </div>

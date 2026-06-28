@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 export const users = sqliteTable('users', {
@@ -12,6 +12,7 @@ export const users = sqliteTable('users', {
 export const skus = sqliteTable('skus', {
   sku: text('sku').primaryKey(),
   description: text('description').notNull().default(''),
+  productId: text('product_id'),
   baseCostCents: integer('base_cost_cents').notNull().default(0),
   shippingAddonCents: integer('shipping_addon_cents').notNull().default(0),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
@@ -37,6 +38,15 @@ export const orders = sqliteTable('orders', {
   status: text('status', {
     enum: ['queued', 'partial', 'batched', 'shipped', 'cancelled'],
   }).notNull().default('queued'),
+  // v2 — ShipStation verification
+  ssVerifyStatus: text('ss_verify_status', {
+    enum: ['unverified', 'verified', 'email_matched', 'not_found', 'error'],
+  }).notNull().default('unverified'),
+  ssShipmentId: text('ss_shipment_id'),
+  ssVerifyCheckedAt: integer('ss_verify_checked_at', { mode: 'timestamp' }),
+  ssVerifyError: text('ss_verify_error'),
+  // v2 — merge tracking
+  mergedIntoOrderNumber: text('merged_into_order_number'),
 })
 
 export const orderItems = sqliteTable('order_items', {
@@ -52,6 +62,12 @@ export const orderItems = sqliteTable('order_items', {
   batchId: text('batch_id').references(() => batches.id),
   ssShipmentId: text('ss_shipment_id'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  // v2 — item-level notes + status flags
+  statusFlag: text('status_flag', {
+    enum: ['out_of_stock', 'backordered', 'discontinued', 'other'],
+  }),
+  pendingUntil: integer('pending_until', { mode: 'timestamp' }),
+  notes: text('notes').notNull().default(''),
 })
 
 export const batches = sqliteTable('batches', {
@@ -62,6 +78,9 @@ export const batches = sqliteTable('batches', {
     enum: ['pending', 'partially_shipped', 'shipped', 'invoiced'],
   }).notNull().default('pending'),
   invoiceId: text('invoice_id').references((): any => invoices.id),
+  // v2 — provenance
+  source: text('source', { enum: ['manual', 'ss_label_sync'] }).notNull().default('ss_label_sync'),
+  labelFetchAt: integer('label_fetch_at', { mode: 'timestamp' }),
 })
 
 export const invoices = sqliteTable('invoices', {
@@ -123,6 +142,13 @@ export const auditLog = sqliteTable('audit_log', {
   action: text('action').notNull(),
   payloadJson: text('payload_json').notNull().default('{}'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+})
+
+// v2 — singleton row tracking incremental "Fetch Printed Labels" pulls from ShipStation
+export const ssSyncCursor = sqliteTable('ss_sync_cursor', {
+  id: integer('id').primaryKey(),
+  lastLabelFetchAt: integer('last_label_fetch_at', { mode: 'timestamp' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 })
 
 export type User = typeof users.$inferSelect

@@ -3,11 +3,13 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { PullOrdersDialog } from './pull-dialog'
 import { NotesCell } from './notes-cell'
+import { ItemStatusPill, OrderNotesModal, type OrderModalData } from './order-notes-modal'
 
 export type QueueItem = {
   id: string
@@ -16,6 +18,9 @@ export type QueueItem = {
   qty: number
   unitPrice: string
   skuMissing: boolean
+  statusFlag: 'out_of_stock' | 'backordered' | 'discontinued' | 'other' | null
+  pendingUntil: string | null
+  itemNotes: string
 }
 export type QueueOrder = {
   orderNumber: string
@@ -34,6 +39,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pushing, setPushing] = useState(false)
   const [filter, setFilter] = useState('')
+  const [modalOrder, setModalOrder] = useState<OrderModalData | null>(null)
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase()
@@ -43,7 +49,11 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
       o.email.toLowerCase().includes(q) ||
       o.customer.toLowerCase().includes(q) ||
       o.notes.toLowerCase().includes(q) ||
-      o.items.some(i => i.sku.toLowerCase().includes(q) || i.name.toLowerCase().includes(q)),
+      o.items.some(i =>
+        i.sku.toLowerCase().includes(q) ||
+        i.name.toLowerCase().includes(q) ||
+        i.itemNotes.toLowerCase().includes(q),
+      ),
     )
   }, [orders, filter])
 
@@ -72,6 +82,24 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
     if (inSel === 0) return 'none'
     if (inSel === o.items.length) return 'all'
     return 'partial'
+  }
+
+  function openModal(o: QueueOrder) {
+    setModalOrder({
+      orderNumber: o.orderNumber,
+      customer: o.customer,
+      email: o.email,
+      notes: o.notes,
+      items: o.items.map(i => ({
+        id: i.id,
+        sku: i.sku,
+        name: i.name,
+        qty: i.qty,
+        statusFlag: i.statusFlag,
+        pendingUntil: i.pendingUntil,
+        notes: i.itemNotes,
+      })),
+    })
   }
 
   const summary = useMemo(() => {
@@ -144,7 +172,7 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
         <thead>
           <tr className="bg-slate-800 text-slate-100 text-[11px] uppercase tracking-wider">
             <th className="w-8 px-3 py-2 text-left"></th>
-            <th className="px-3 py-2 text-left font-semibold w-28">Order</th>
+            <th className="px-3 py-2 text-left font-semibold w-36">Order</th>
             <th className="px-3 py-2 text-left font-semibold">Customer</th>
             <th className="px-3 py-2 text-left font-semibold">Email</th>
             <th className="px-3 py-2 text-left font-semibold">Notes</th>
@@ -179,7 +207,23 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                   </td>
                   <td className="px-3 py-1.5 align-middle">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-semibold text-slate-900">#{o.orderNumber}</span>
+                      <button
+                        type="button"
+                        onClick={() => openModal(o)}
+                        className="font-mono font-semibold text-slate-900 hover:text-emerald-700 hover:underline cursor-pointer"
+                        title="Open notes & item status"
+                      >
+                        #{o.orderNumber}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openModal(o)}
+                        className="text-slate-500 hover:text-emerald-700 p-0.5 rounded hover:bg-white"
+                        title="Open notes & item status"
+                        aria-label="Edit order notes"
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
                       {o.urgent && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-red-600 text-white">
                           Urgent
@@ -221,6 +265,16 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
                             SKU not in DB
                           </span>
                         )}
+                        {i.statusFlag && (
+                          <span className="ml-2 align-middle">
+                            <ItemStatusPill flag={i.statusFlag} pendingUntil={i.pendingUntil} />
+                          </span>
+                        )}
+                        {i.itemNotes && (
+                          <span className="ml-2 text-[11px] text-slate-500 italic align-middle" title={i.itemNotes}>
+                            “{i.itemNotes.length > 60 ? i.itemNotes.slice(0, 57) + '…' : i.itemNotes}”
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-1 align-middle text-right text-slate-700 tabular-nums">{i.qty}</td>
                       <td className="px-3 py-1 align-middle text-right text-slate-700 tabular-nums">{i.unitPrice}</td>
@@ -232,6 +286,12 @@ export function QueueTable({ orders }: { orders: QueueOrder[] }) {
           })}
         </tbody>
       </table>
+
+      <OrderNotesModal
+        open={!!modalOrder}
+        onClose={() => setModalOrder(null)}
+        initial={modalOrder}
+      />
     </div>
   )
 }
