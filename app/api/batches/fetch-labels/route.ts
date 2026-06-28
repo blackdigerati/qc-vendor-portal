@@ -7,6 +7,11 @@ import { writeAudit } from '@/lib/audit'
 
 const DEFAULT_LOOKBACK_HOURS = 24
 
+type Body = {
+  sinceISO?: string    // override the cursor with a custom "fetch labels created after this"
+  maxLabels?: number   // hard cap on labels scanned this run (testing safety)
+}
+
 function nextBatchId(): string {
   const year = new Date().getFullYear()
   const prefix = `B-${year}-`
@@ -31,9 +36,13 @@ function normSku(s: string | undefined | null): string {
   return (s || '').trim().toLowerCase()
 }
 
-export async function POST(_req: Request) {
+export async function POST(req: Request) {
   const s = await requireSession()
-  const sinceISO = pickSinceISO()
+  const body = (await req.json().catch(() => ({}))) as Body
+  const overrideSince = typeof body.sinceISO === 'string' && body.sinceISO ? new Date(body.sinceISO) : null
+  const sinceISO = overrideSince ? overrideSince.toISOString() : pickSinceISO()
+  const maxLabels = typeof body.maxLabels === 'number' && body.maxLabels > 0 ? body.maxLabels : undefined
+  const usingOverride = !!overrideSince
   const fetchedAt = new Date()
 
   let labels
@@ -42,6 +51,7 @@ export async function POST(_req: Request) {
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'SS fetch failed' }, { status: 502 })
   }
+  if (maxLabels && labels.length > maxLabels) labels = labels.slice(0, maxLabels)
 
   // Dedupe by shipment_id; drop any shipments we've already imported into an order_item batch
   const seenShipIds = new Set(
@@ -62,8 +72,8 @@ export async function POST(_req: Request) {
   }
 
   if (newShipIds.length === 0) {
-    // Still bump cursor — nothing new to fetch
-    upsertCursor(fetchedAt)
+    // Only bump cursor on a normal (non-override) run
+    if (!usingOverride) upsertCursor(fetchedAt)
     return NextResponse.json({
       batchId: null,
       sinceISO,
@@ -166,7 +176,9 @@ export async function POST(_req: Request) {
     status: 'shipped',
   }).where(eq(schema.batches.id, batchId)).run()
 
-  upsertCursor(fetchedAt)
+  // Only advance the cursor on a normal (non-override) run, so testers
+  // can re-fetch historical ranges without losing their place.
+  if (!usingOverride) upsertCursor(fetchedAt)
 
   const payload = {
     batchId,
