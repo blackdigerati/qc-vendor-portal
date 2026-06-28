@@ -14,6 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/billing', label: 'Billing' },
     { href: '/ledger', label: 'Ledger' },
     { href: '/payments', label: 'Payments' },
+    { href: '/out-of-stock', label: 'Out of Stock' },
     { href: '/settings/skus', label: 'Settings', adminOnly: true },
   ]
   return (
