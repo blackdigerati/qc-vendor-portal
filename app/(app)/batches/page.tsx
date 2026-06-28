@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, inArray } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { fromCents } from '@/lib/money'
 import { FetchLabelsButton } from './fetch-labels-button'
+import { SimulateLabelsDialog, type SimQueueOrder } from './simulate-labels-dialog'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,28 @@ export default async function BatchesPage() {
   const invs = batches.length ? db.select().from(schema.invoices).all() : []
   const invMap = new Map(invs.map(i => [i.id, i]))
   const cursor = db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)).get()
+  const isDev = process.env.NODE_ENV !== 'production'
+
+  // Build queue snapshot for the dev simulate dialog
+  let simQueue: SimQueueOrder[] = []
+  if (isDev) {
+    const queuedOrders = db
+      .select()
+      .from(schema.orders)
+      .where(inArray(schema.orders.status, ['queued', 'partial']))
+      .all()
+    const orderNums = queuedOrders.map(o => o.orderNumber)
+    const items = orderNums.length
+      ? db.select().from(schema.orderItems).where(inArray(schema.orderItems.orderNumber, orderNums)).all().filter(i => i.status === 'queued')
+      : []
+    simQueue = queuedOrders.map(o => ({
+      orderNumber: o.orderNumber,
+      customer: [o.firstName, o.lastName].filter(Boolean).join(' '),
+      items: items
+        .filter(i => i.orderNumber === o.orderNumber)
+        .map(i => ({ id: i.id, sku: i.sku, name: i.name, qty: i.qty })),
+    })).filter(o => o.items.length > 0)
+  }
 
   return (
     <div className="space-y-3">
@@ -33,7 +56,10 @@ export default async function BatchesPage() {
           <h1 className="text-xl font-semibold tracking-tight">Batches</h1>
           <p className="text-[13px] text-slate-600 mt-0.5">{batches.length} batch{batches.length === 1 ? '' : 'es'} total · built from ShipStation labels.</p>
         </div>
-        <FetchLabelsButton lastFetchISO={cursor?.lastLabelFetchAt?.toISOString() ?? null} />
+        <div className="flex items-center gap-2">
+          {isDev && <SimulateLabelsDialog queue={simQueue} />}
+          <FetchLabelsButton lastFetchISO={cursor?.lastLabelFetchAt?.toISOString() ?? null} />
+        </div>
       </div>
       <div className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
         <table className="w-full text-[13px] border-collapse">
