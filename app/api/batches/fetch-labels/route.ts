@@ -171,6 +171,32 @@ export async function POST(req: Request) {
     }
   }
 
+  // If nothing actually got into the batch (every shipment unmatched), drop the empty batch
+  if (summary.itemsBatched === 0) {
+    db.delete(schema.batches).where(eq(schema.batches.id, batchId)).run()
+    if (!usingOverride) upsertCursor(fetchedAt)
+    return NextResponse.json({
+      batchId: null,
+      sinceISO,
+      labelsScanned: labels.length,
+      shipmentsImported: 0,
+      ordersTouched: 0,
+      itemsBatched: 0,
+      partialOrders: 0,
+      fullyShippedOrders: 0,
+      unmatchedShipments: summary.unmatchedShipments.length,
+      unmatchedItems: summary.unmatchedItems.length,
+      message:
+        summary.unmatchedShipments.length > 0
+          ? `Found ${summary.unmatchedShipments.length} shipped order${summary.unmatchedShipments.length === 1 ? '' : 's'} in ShipStation, but none match orders in the portal queue. Pull the orders into the queue first.`
+          : 'No matching shipped orders to batch.',
+      detail: {
+        unmatchedShipments: summary.unmatchedShipments,
+        unmatchedItems: summary.unmatchedItems,
+      },
+    })
+  }
+
   // Roll up batch status
   db.update(schema.batches).set({
     status: 'shipped',
