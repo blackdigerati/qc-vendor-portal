@@ -36,6 +36,10 @@ function normSku(s: string | undefined | null): string {
   return (s || '').trim().toLowerCase()
 }
 
+function normName(s: string | undefined | null): string {
+  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 export async function POST(req: Request) {
   const s = await requireSession()
   const body = (await req.json().catch(() => ({}))) as Body
@@ -129,12 +133,28 @@ export async function POST(req: Request) {
 
     const shipItems: SSShipmentItem[] = ship.items || []
 
-    // Match each SS shipment item to a queued item by SKU
+    // Match each SS shipment item to a queued item. SS often returns items with
+    // empty SKU, so we try in order: SKU exact → name exact → single-item fallback.
     const matchedQueueIds = new Set<string>()
     for (const si of shipItems) {
       const sku = normSku(si.sku)
-      if (!sku) continue
-      const candidate = queuedItems.find(qi => normSku(qi.sku) === sku && !matchedQueueIds.has(qi.id))
+      const name = normName(si.name)
+
+      let candidate = sku
+        ? queuedItems.find(qi => normSku(qi.sku) === sku && !matchedQueueIds.has(qi.id))
+        : undefined
+
+      if (!candidate && name) {
+        candidate = queuedItems.find(qi => normName(qi.name) === name && !matchedQueueIds.has(qi.id))
+      }
+
+      // Last-resort: if there's exactly one unmatched item on each side and no
+      // identifier at all, match them positionally.
+      if (!candidate && !sku && !name) {
+        const remaining = queuedItems.filter(qi => !matchedQueueIds.has(qi.id))
+        if (remaining.length === 1 && shipItems.length === 1) candidate = remaining[0]
+      }
+
       if (!candidate) {
         summary.unmatchedItems.push({ orderNumber, sku: si.sku || '', qty: si.quantity ?? 0 })
         continue
@@ -186,10 +206,20 @@ export async function POST(req: Request) {
       fullyShippedOrders: 0,
       unmatchedShipments: summary.unmatchedShipments.length,
       unmatchedItems: summary.unmatchedItems.length,
-      message:
-        summary.unmatchedShipments.length > 0
-          ? `Found ${summary.unmatchedShipments.length} shipped order${summary.unmatchedShipments.length === 1 ? '' : 's'} in ShipStation, but none match orders in the portal queue. Pull the orders into the queue first.`
-          : 'No matching shipped orders to batch.',
+      message: (() => {
+        const unmatchedOrders = summary.unmatchedShipments.length
+        const unmatchedItems = summary.unmatchedItems.length
+        if (unmatchedItems > 0 && unmatchedOrders === 0) {
+          return `Found ${unmatchedItems} shipped item${unmatchedItems === 1 ? '' : 's'} matched to portal orders, but couldn't pair them to queued line items (SKU + name both differ). Check that the order's items in the portal match what shipped.`
+        }
+        if (unmatchedOrders > 0 && unmatchedItems === 0) {
+          return `Found ${unmatchedOrders} shipped order${unmatchedOrders === 1 ? '' : 's'} in ShipStation, but none match orders in the portal queue. Pull the orders into the queue first.`
+        }
+        if (unmatchedOrders > 0 || unmatchedItems > 0) {
+          return `Found ${unmatchedOrders} unmatched order${unmatchedOrders === 1 ? '' : 's'} and ${unmatchedItems} unmatched line item${unmatchedItems === 1 ? '' : 's'}. Nothing batched.`
+        }
+        return 'No matching shipped orders to batch.'
+      })(),
       detail: {
         unmatchedShipments: summary.unmatchedShipments,
         unmatchedItems: summary.unmatchedItems,
