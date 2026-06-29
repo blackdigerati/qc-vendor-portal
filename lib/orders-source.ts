@@ -103,13 +103,25 @@ export function parseXlsx(buf: Buffer): OrderRow[] {
 }
 
 export async function readGoogleSheet(sheetId: string, tab: string): Promise<OrderRow[]> {
-  const credPath = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  if (credPath) {
-    // Service-account path (private sheets)
-    const auth = new google.auth.GoogleAuth({
-      keyFile: credPath,
+  // GOOGLE_SERVICE_ACCOUNT_JSON can be either a file path (local dev) or the
+  // raw JSON itself (Vercel + any other serverless host where you can't ship a
+  // file). We detect which by looking at the first character.
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  if (raw) {
+    const trimmed = raw.trim()
+    const authConfig: { scopes: string[]; keyFile?: string; credentials?: Record<string, unknown> } = {
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-    })
+    }
+    if (trimmed.startsWith('{')) {
+      try {
+        authConfig.credentials = JSON.parse(trimmed)
+      } catch (e) {
+        throw new Error(`GOOGLE_SERVICE_ACCOUNT_JSON looks like JSON but failed to parse: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    } else {
+      authConfig.keyFile = trimmed
+    }
+    const auth = new google.auth.GoogleAuth(authConfig)
     const sheets = google.sheets({ version: 'v4', auth })
     const resp = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
