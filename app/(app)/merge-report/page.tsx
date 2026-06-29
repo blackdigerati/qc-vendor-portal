@@ -26,7 +26,7 @@ type Group = {
 export default async function MergeReportPage() {
   // Pull all orders — we need merged (cancelled) ones too so we can keep
   // groups visible after a merge completes.
-  const orders = db.select().from(schema.orders).all()
+  const orders = await db.select().from(schema.orders)
   const byEmail = new Map<string, typeof orders>()
   for (const o of orders) {
     const list = byEmail.get(o.email) || []

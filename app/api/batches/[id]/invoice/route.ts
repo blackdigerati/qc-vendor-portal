@@ -8,18 +8,17 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const s = await requireAdmin()
   const { id: batchId } = await params
 
-  const batch = db.select().from(schema.batches).where(eq(schema.batches.id, batchId)).get()
+  const batch = (await db.select().from(schema.batches).where(eq(schema.batches.id, batchId)))[0]
   if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
   if (!batch.invoiceId) return NextResponse.json({ error: 'Batch has no invoice' }, { status: 409 })
 
   const invoiceId = batch.invoiceId
 
   // Block if any allocations already exist (payments touched this invoice)
-  const allocCount = db
+  const allocCount = (await db
     .select({ c: sql<number>`count(*)` })
     .from(schema.paymentAllocations)
-    .where(eq(schema.paymentAllocations.invoiceId, invoiceId))
-    .get()?.c ?? 0
+    .where(eq(schema.paymentAllocations.invoiceId, invoiceId)))[0]?.c ?? 0
   if (allocCount > 0) {
     return NextResponse.json({
       error: 'Cannot delete — payments have already been allocated to this invoice. Cancel those first.',
@@ -27,12 +26,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   }
 
   // 1) Clear FK on the batch
-  db.update(schema.batches).set({ status: 'shipped', invoiceId: null })
-    .where(eq(schema.batches.id, batchId)).run()
+  await db.update(schema.batches).set({ status: 'shipped', invoiceId: null })
+    .where(eq(schema.batches.id, batchId))
   // 2) Remove invoice lines
-  db.delete(schema.invoiceLines).where(eq(schema.invoiceLines.invoiceId, invoiceId)).run()
+  await db.delete(schema.invoiceLines).where(eq(schema.invoiceLines.invoiceId, invoiceId))
   // 3) Remove invoice
-  db.delete(schema.invoices).where(eq(schema.invoices.id, invoiceId)).run()
+  await db.delete(schema.invoices).where(eq(schema.invoices.id, invoiceId))
 
   await writeAudit({
     actor: s.userId,

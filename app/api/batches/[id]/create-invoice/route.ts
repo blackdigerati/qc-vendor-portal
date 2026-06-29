@@ -8,7 +8,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const s = await requireSession()
   const { id } = await params
 
-  const batch = db.select().from(schema.batches).where(eq(schema.batches.id, id)).get()
+  const batch = (await db.select().from(schema.batches).where(eq(schema.batches.id, id)))[0]
   if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
   if (batch.invoiceId) return NextResponse.json({ error: `Batch already has invoice ${batch.invoiceId}` }, { status: 409 })
 

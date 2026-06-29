@@ -41,7 +41,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ orderN
 
   // Apply: inserts for "added", cancel for "removed", update qty for "qtyChanged"
   for (const a of diff.added) {
-    db.insert(schema.orderItems).values({
+    await db.insert(schema.orderItems).values({
       id: newId('oi'),
       orderNumber,
       sku: a.sku,
@@ -49,21 +49,21 @@ export async function POST(_req: Request, { params }: { params: Promise<{ orderN
       qty: a.qty,
       costOfGoodsCents: a.unitCostCents,
       status: 'queued',
-    }).run()
+    })
 
     // Auto-create SKU if not present (mirrors orders-pull behavior)
-    const skuRow = db.select().from(schema.skus).where(eq(schema.skus.sku, a.sku)).get()
+    const skuRow = (await db.select().from(schema.skus).where(eq(schema.skus.sku, a.sku)))[0]
     if (!skuRow && a.sku) {
-      db.insert(schema.skus).values({
+      await db.insert(schema.skus).values({
         sku: a.sku, description: a.name, baseCostCents: a.unitCostCents, active: true,
-      }).run()
+      })
     }
   }
   for (const r of diff.removed) {
-    db.update(schema.orderItems).set({ status: 'cancelled' }).where(eq(schema.orderItems.id, r.id)).run()
+    await db.update(schema.orderItems).set({ status: 'cancelled' }).where(eq(schema.orderItems.id, r.id))
   }
   for (const c of diff.qtyChanged) {
-    db.update(schema.orderItems).set({ qty: c.ssQty }).where(eq(schema.orderItems.id, c.id)).run()
+    await db.update(schema.orderItems).set({ qty: c.ssQty }).where(eq(schema.orderItems.id, c.id))
   }
 
   await writeAudit({
@@ -83,7 +83,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ orderN
 }
 
 async function computeDiff(orderNumber: string): Promise<ReconcileDiff | { error: string; status: number }> {
-  const order = db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber)).get()
+  const order = (await db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber)))[0]
   if (!order) return { error: 'Order not in portal', status: 404 }
 
   const shipments = await lookupShipments(orderNumber)
@@ -98,11 +98,10 @@ async function computeDiff(orderNumber: string): Promise<ReconcileDiff | { error
   }
 
   // Portal items in reconcilable state (skip batched/shipped — locked)
-  const portalItems = db
+  const portalItems = await db
     .select()
     .from(schema.orderItems)
     .where(sql`${schema.orderItems.orderNumber} = ${orderNumber} AND ${schema.orderItems.status} IN ('queued','partial')`)
-    .all()
 
   // Match each SS item to a portal item; track which portal items got hit
   const portalMatched = new Set<string>()
@@ -119,11 +118,18 @@ async function computeDiff(orderNumber: string): Promise<ReconcileDiff | { error
       pi = portalItems.find(p => normName(p.name) === name && !portalMatched.has(p.id))
     }
     if (!pi) {
+      // SS doesn't carry prices — look up the SKU's COG in our catalog so the
+      // new portal item gets the right price for invoicing.
+      let unitCostCents = 0
+      if (si.sku) {
+        const skuRow = (await db.select().from(schema.skus).where(eq(schema.skus.sku, si.sku)))[0]
+        if (skuRow) unitCostCents = skuRow.baseCostCents
+      }
       added.push({
         sku: si.sku || '',
         name: si.name || '',
         qty: si.quantity ?? 1,
-        unitCostCents: 0,
+        unitCostCents,
       })
       continue
     }

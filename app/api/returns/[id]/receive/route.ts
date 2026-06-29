@@ -12,19 +12,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const creditCents = toCents(body.credit)
   const notes = String(body.notes || '').trim().slice(0, 2000)
 
-  const r = db.select().from(schema.returns).where(eq(schema.returns.id, id)).get()
+  const r = (await db.select().from(schema.returns).where(eq(schema.returns.id, id)))[0]
   if (!r) return NextResponse.json({ error: 'Return not found' }, { status: 404 })
   if (r.status !== 'logged') return NextResponse.json({ error: `Already ${r.status}` }, { status: 409 })
   if (creditCents <= 0) return NextResponse.json({ error: 'Credit amount must be > 0' }, { status: 400 })
 
   const now = new Date()
-  db.update(schema.returns).set({
+  await db.update(schema.returns).set({
     status: 'received',
     receivedAt: now,
     receivedBy: s.userId,
     creditCents,
     notes: notes || r.notes,
-  }).where(eq(schema.returns.id, id)).run()
+  }).where(eq(schema.returns.id, id))
 
   await writeAudit({
     actor: s.userId,

@@ -14,9 +14,9 @@ export async function POST(req: Request) {
     .map(r => ({ email: String(r.email || '').trim().toLowerCase(), eventType: r.eventType }))
     .filter(r => r.email && (r.eventType === 'new_orders' || r.eventType === 'new_invoice'))
 
-  db.delete(schema.alertRecipients).run()
+  await db.delete(schema.alertRecipients)
   for (const r of clean) {
-    db.insert(schema.alertRecipients).values({ id: newId('ar'), email: r.email, eventType: r.eventType }).run()
+    await db.insert(schema.alertRecipients).values({ id: newId('ar'), email: r.email, eventType: r.eventType })
   }
 
   await writeAudit({ actor: s.userId, entityType: 'settings', entityId: 'alerts', action: 'alerts.updated', payload: { count: clean.length } })

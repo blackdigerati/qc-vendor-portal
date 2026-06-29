@@ -21,9 +21,9 @@ function statusPill(s: string) {
 export default async function BillingPage() {
   const session = await getSession()
   const isAdmin = session.role === 'admin'
-  const ledger = getLedger()
-  const invoices = db.select().from(schema.invoices).orderBy(desc(schema.invoices.createdAt)).all()
-  const rows = invoices.map(inv => ({ ...inv, openCents: invoiceOpenBalance(inv.id) }))
+  const ledger = await getLedger()
+  const invoices = await db.select().from(schema.invoices).orderBy(desc(schema.invoices.createdAt))
+  const rows = await Promise.all(invoices.map(async inv => ({ ...inv, openCents: await invoiceOpenBalance(inv.id) })))
   const openInvoiceOptions = rows.filter(r => r.openCents > 0).map(r => ({ id: r.id, openCents: r.openCents }))
 
   return (

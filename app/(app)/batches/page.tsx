@@ -22,23 +22,22 @@ function statusPill(status: string) {
 }
 
 export default async function BatchesPage() {
-  const batches = db.select().from(schema.batches).orderBy(desc(schema.batches.createdAt)).all()
-  const invs = batches.length ? db.select().from(schema.invoices).all() : []
+  const batches = await db.select().from(schema.batches).orderBy(desc(schema.batches.createdAt))
+  const invs = batches.length ? await db.select().from(schema.invoices) : []
   const invMap = new Map(invs.map(i => [i.id, i]))
-  const cursor = db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)).get()
+  const cursor = (await db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)))[0]
   const isDev = process.env.NODE_ENV !== 'production'
 
   // Build queue snapshot for the dev simulate dialog
   let simQueue: SimQueueOrder[] = []
   if (isDev) {
-    const queuedOrders = db
+    const queuedOrders = await db
       .select()
       .from(schema.orders)
       .where(inArray(schema.orders.status, ['queued', 'partial']))
-      .all()
     const orderNums = queuedOrders.map(o => o.orderNumber)
     const items = orderNums.length
-      ? db.select().from(schema.orderItems).where(inArray(schema.orderItems.orderNumber, orderNums)).all().filter(i => i.status === 'queued')
+      ? (await db.select().from(schema.orderItems).where(inArray(schema.orderItems.orderNumber, orderNums))).filter(i => i.status === 'queued')
       : []
     simQueue = queuedOrders.map(o => ({
       orderNumber: o.orderNumber,

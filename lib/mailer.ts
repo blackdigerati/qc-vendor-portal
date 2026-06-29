@@ -4,11 +4,10 @@ import { eq } from 'drizzle-orm'
 type EventType = 'new_orders' | 'new_invoice'
 
 export async function sendAlert(eventType: EventType, subject: string, body: string) {
-  const recipients = db
+  const recipients = (await db
     .select({ email: schema.alertRecipients.email })
     .from(schema.alertRecipients)
-    .where(eq(schema.alertRecipients.eventType, eventType))
-    .all()
+    .where(eq(schema.alertRecipients.eventType, eventType)))
     .map(r => r.email)
 
   if (recipients.length === 0) {

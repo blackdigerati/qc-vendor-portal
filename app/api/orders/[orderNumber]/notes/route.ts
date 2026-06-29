@@ -10,11 +10,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderN
   const body = await req.json().catch(() => ({}))
   const notes = String(body.notes ?? '').slice(0, 2000)
 
-  const existing = db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber)).get()
+  const existing = (await db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber)))[0]
   if (!existing) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   if (existing.notes === notes) return NextResponse.json({ ok: true, unchanged: true })
 
-  db.update(schema.orders).set({ notes }).where(eq(schema.orders.orderNumber, orderNumber)).run()
+  await db.update(schema.orders).set({ notes }).where(eq(schema.orders.orderNumber, orderNumber))
 
   await writeAudit({
     actor: s.userId,

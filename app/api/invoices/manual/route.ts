@@ -20,10 +20,10 @@ type Body = {
   lines: LineInput[]
 }
 
-function nextInvoiceId(): string {
+async function nextInvoiceId(): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = `INV-${year}-`
-  const ids = db.select({ id: schema.invoices.id }).from(schema.invoices).all().map(r => r.id)
+  const ids = (await db.select({ id: schema.invoices.id }).from(schema.invoices)).map(r => r.id)
   let max = 0
   for (const id of ids) {
     if (!id.startsWith(prefix)) continue
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const linesIn = Array.isArray(body.lines) ? body.lines : []
   if (linesIn.length === 0) return NextResponse.json({ error: 'Add at least one line' }, { status: 400 })
 
-  const invoiceId = nextInvoiceId()
+  const invoiceId = await nextInvoiceId()
   let total = 0
   const lines: (typeof schema.invoiceLines.$inferInsert)[] = []
 
@@ -64,14 +64,14 @@ export async function POST(req: Request) {
   }
   if (lines.length === 0) return NextResponse.json({ error: 'No lines have a charge' }, { status: 400 })
 
-  db.insert(schema.invoices).values({
+  await db.insert(schema.invoices).values({
     id: invoiceId,
     batchId: null,
     totalCents: total,
     status: 'open',
     description,
-  }).run()
-  for (const ln of lines) db.insert(schema.invoiceLines).values(ln).run()
+  })
+  for (const ln of lines) await db.insert(schema.invoiceLines).values(ln)
 
   await writeAudit({
     actor: s.userId,

@@ -7,8 +7,8 @@ import { MarkReceivedButton } from './mark-received-button'
 export const dynamic = 'force-dynamic'
 
 export default async function ReturnsPage() {
-  const logged = db.select().from(schema.returns).where(eq(schema.returns.status, 'logged')).orderBy(desc(schema.returns.loggedAt)).all()
-  const received = db.select().from(schema.returns).where(eq(schema.returns.status, 'received')).orderBy(desc(schema.returns.receivedAt)).all()
+  const logged = await db.select().from(schema.returns).where(eq(schema.returns.status, 'logged')).orderBy(desc(schema.returns.loggedAt))
+  const received = await db.select().from(schema.returns).where(eq(schema.returns.status, 'received')).orderBy(desc(schema.returns.receivedAt))
   const creditSum = received.reduce((a, r) => a + r.creditCents, 0)
 
   return (

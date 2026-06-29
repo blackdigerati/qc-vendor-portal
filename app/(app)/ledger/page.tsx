@@ -14,16 +14,15 @@ type Row =
   | { kind: 'payment'; date: Date; debitCents: number; creditCents: number; paymentId: string; refNote: string; allocations: Allocation[]; creditRemainCents: number }
 
 export default async function LedgerPage() {
-  const l = getLedger()
-  const ob = db.select().from(schema.ledgerOpeningBalance).get()
-  const invoices = db.select().from(schema.invoices).orderBy(desc(schema.invoices.createdAt)).all()
-  const payments = db
+  const l = await getLedger()
+  const ob = (await db.select().from(schema.ledgerOpeningBalance))[0]
+  const invoices = await db.select().from(schema.invoices).orderBy(desc(schema.invoices.createdAt))
+  const payments = await db
     .select()
     .from(schema.payments)
     .where(sql`${schema.payments.status} IN ('received', 'approved')`)
     .orderBy(desc(schema.payments.paidOn))
-    .all()
-  const allocs = db.select().from(schema.paymentAllocations).all()
+  const allocs = await db.select().from(schema.paymentAllocations)
   const allocsByPayment = new Map<string, Allocation[]>()
   for (const a of allocs) {
     const list = allocsByPayment.get(a.paymentId) || []

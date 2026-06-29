@@ -11,24 +11,22 @@ function isoDate(d: Date | null | undefined): string | null {
 }
 
 export default async function QueuePage() {
-  const orders = db
+  const orders = await db
     .select()
     .from(schema.orders)
     .where(inArray(schema.orders.status, ['queued', 'partial']))
     .orderBy(desc(schema.orders.urgent), desc(schema.orders.pulledAt))
-    .all()
 
   const orderNums = orders.map(o => o.orderNumber)
   const items = orderNums.length
-    ? db
+    ? (await db
         .select()
         .from(schema.orderItems)
-        .where(inArray(schema.orderItems.orderNumber, orderNums))
-        .all()
+        .where(inArray(schema.orderItems.orderNumber, orderNums)))
         .filter(i => i.status === 'queued')
     : []
 
-  const skuRows = db.select({ sku: schema.skus.sku }).from(schema.skus).all()
+  const skuRows = await db.select({ sku: schema.skus.sku }).from(schema.skus)
   const knownSkus = new Set(skuRows.map(r => r.sku))
 
   const emailCounts = new Map<string, number>()
@@ -36,11 +34,10 @@ export default async function QueuePage() {
   const mergeEmails = new Set([...emailCounts.entries()].filter(([, n]) => n > 1).map(([e]) => e))
 
   // Build survivor → [absorbed order#s] map from the orders table
-  const mergedRows = db
+  const mergedRows = await db
     .select()
     .from(schema.orders)
     .where(isNotNull(schema.orders.mergedIntoOrderNumber))
-    .all()
   const mergedFrom = new Map<string, string[]>()
   for (const m of mergedRows) {
     if (!m.mergedIntoOrderNumber) continue

@@ -11,10 +11,10 @@ type Body = {
   itemIds: string[]
 }
 
-function nextBatchId(): string {
+async function nextBatchId(): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = `B-${year}-`
-  const ids = db.select({ id: schema.batches.id }).from(schema.batches).all().map(r => r.id)
+  const ids = (await db.select({ id: schema.batches.id }).from(schema.batches)).map(r => r.id)
   let max = 0
   for (const id of ids) {
     if (!id.startsWith(prefix)) continue
@@ -33,21 +33,21 @@ export async function POST(req: Request) {
   const itemIds = Array.isArray(body.itemIds) ? body.itemIds.filter(Boolean) : []
   if (itemIds.length === 0) return NextResponse.json({ error: 'No items selected' }, { status: 400 })
 
-  const items = db.select().from(schema.orderItems).where(inArray(schema.orderItems.id, itemIds)).all()
+  const items = await db.select().from(schema.orderItems).where(inArray(schema.orderItems.id, itemIds))
   const queued = items.filter(i => i.status === 'queued')
   if (queued.length === 0) return NextResponse.json({ error: 'Selected items are no longer queued' }, { status: 409 })
 
-  const batchId = nextBatchId()
+  const batchId = await nextBatchId()
   const now = new Date()
   const fakeShipmentBase = 'sim_' + now.getTime().toString(36)
 
-  db.insert(schema.batches).values({
+  await db.insert(schema.batches).values({
     id: batchId,
     createdBy: s.userId,
     status: 'shipped',
     source: 'ss_label_sync',
     labelFetchAt: now,
-  }).run()
+  })
 
   const orderNums = [...new Set(queued.map(i => i.orderNumber))]
 
@@ -59,42 +59,41 @@ export async function POST(req: Request) {
 
   for (const it of queued) {
     const ssId = shipMap.get(it.orderNumber)!
-    db.update(schema.orderItems).set({
+    await db.update(schema.orderItems).set({
       status: 'shipped',
       batchId,
       ssShipmentId: ssId,
-    }).where(eq(schema.orderItems.id, it.id)).run()
+    }).where(eq(schema.orderItems.id, it.id))
   }
 
   // Recompute parent order statuses
   const summary = { partialOrders: 0, fullyShippedOrders: 0 }
   for (const on of orderNums) {
-    const remaining = db
+    const remaining = (await db
       .select({ c: sql<number>`count(*)` })
       .from(schema.orderItems)
-      .where(sql`${schema.orderItems.orderNumber} = ${on} AND ${schema.orderItems.status} = 'queued'`)
-      .get()?.c ?? 0
+      .where(sql`${schema.orderItems.orderNumber} = ${on} AND ${schema.orderItems.status} = 'queued'`))[0]?.c ?? 0
     if (remaining === 0) {
-      db.update(schema.orders).set({ status: 'shipped' })
-        .where(eq(schema.orders.orderNumber, on)).run()
+      await db.update(schema.orders).set({ status: 'shipped' })
+        .where(eq(schema.orders.orderNumber, on))
       summary.fullyShippedOrders++
     } else {
-      db.update(schema.orders).set({ status: 'partial' })
-        .where(eq(schema.orders.orderNumber, on)).run()
+      await db.update(schema.orders).set({ status: 'partial' })
+        .where(eq(schema.orders.orderNumber, on))
       summary.partialOrders++
     }
     const ssId = shipMap.get(on)!
-    db.update(schema.orders).set({ ssShipmentId: ssId })
-      .where(eq(schema.orders.orderNumber, on)).run()
+    await db.update(schema.orders).set({ ssShipmentId: ssId })
+      .where(eq(schema.orders.orderNumber, on))
   }
 
   // Bump cursor so a real Fetch Printed Labels after this picks up only newer ones
-  const cur = db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)).get()
+  const cur = (await db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)))[0]
   if (cur) {
-    db.update(schema.ssSyncCursor).set({ lastLabelFetchAt: now, updatedAt: now })
-      .where(eq(schema.ssSyncCursor.id, 1)).run()
+    await db.update(schema.ssSyncCursor).set({ lastLabelFetchAt: now, updatedAt: now })
+      .where(eq(schema.ssSyncCursor.id, 1))
   } else {
-    db.insert(schema.ssSyncCursor).values({ id: 1, lastLabelFetchAt: now }).run()
+    await db.insert(schema.ssSyncCursor).values({ id: 1, lastLabelFetchAt: now })
   }
 
   await writeAudit({

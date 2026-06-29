@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ sku: s
   const { sku } = await params
   const body = (await req.json().catch(() => ({}))) as Body
 
-  const skuRow = db.select().from(schema.skus).where(eq(schema.skus.sku, sku)).get()
+  const skuRow = (await db.select().from(schema.skus).where(eq(schema.skus.sku, sku)))[0]
   if (!skuRow) return NextResponse.json({ error: 'SKU not found' }, { status: 404 })
 
   const skuPatch: Partial<typeof schema.skus.$inferInsert> = { updatedAt: new Date() }
@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ sku: s
   }
   if ('notes' in body) skuPatch.statusNotes = String(body.notes ?? '').slice(0, 2000)
 
-  db.update(schema.skus).set(skuPatch).where(eq(schema.skus.sku, sku)).run()
+  await db.update(schema.skus).set(skuPatch).where(eq(schema.skus.sku, sku))
 
   // Cascade to every order_items row sharing the SKU
   const cascadeUpdate: Partial<typeof schema.orderItems.$inferInsert> = {}
@@ -36,18 +36,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ sku: s
   if ('pendingUntil' in body) cascadeUpdate.pendingUntil = body.pendingUntil ? new Date(body.pendingUntil) : null
   if ('notes' in body) cascadeUpdate.notes = String(body.notes ?? '').slice(0, 2000)
 
-  const r = db.update(schema.orderItems)
+  const r = await db.update(schema.orderItems)
     .set(cascadeUpdate)
     .where(eq(schema.orderItems.sku, sku))
-    .run()
 
   await writeAudit({
     actor: s.userId,
     entityType: 'sku',
     entityId: sku,
     action: 'sku.status.updated',
-    payload: { changes: skuPatch, cascadedToItems: r.changes, previous: { statusFlag: skuRow.statusFlag } },
+    payload: { changes: skuPatch, cascadedToItems: r.rowsAffected, previous: { statusFlag: skuRow.statusFlag } },
   })
 
-  return NextResponse.json({ ok: true, cascadedToItems: r.changes })
+  return NextResponse.json({ ok: true, cascadedToItems: r.rowsAffected })
 }

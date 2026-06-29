@@ -14,9 +14,9 @@ export async function POST(req: Request) {
   const s = await requireSession()
   const body = (await req.json().catch(() => ({}))) as Body
 
-  let toCheck = db.select().from(schema.orders).where(
+  let toCheck = await db.select().from(schema.orders).where(
     inArray(schema.orders.status, ['queued', 'partial']),
-  ).all()
+  )
 
   if (body.orderNumbers && body.orderNumbers.length > 0) {
     const set = new Set(body.orderNumbers)
@@ -32,41 +32,41 @@ export async function POST(req: Request) {
     try {
       const ships = await lookupShipments(o.orderNumber)
       if (ships.length > 0 && ships[0].shipment_id) {
-        db.update(schema.orders).set({
+        await db.update(schema.orders).set({
           ssVerifyStatus: 'verified',
           ssShipmentId: ships[0].shipment_id,
           ssVerifyCheckedAt: now,
           ssVerifyError: null,
-        }).where(eq(schema.orders.orderNumber, o.orderNumber)).run()
+        }).where(eq(schema.orders.orderNumber, o.orderNumber))
         verified++
         continue
       }
       // Fallback by email
       const byEmail = o.email ? await lookupShipmentsByEmail(o.email) : []
       if (byEmail.length > 0 && byEmail[0].shipment_id) {
-        db.update(schema.orders).set({
+        await db.update(schema.orders).set({
           ssVerifyStatus: 'email_matched',
           ssShipmentId: byEmail[0].shipment_id,
           ssVerifyCheckedAt: now,
           ssVerifyError: `Found via email (${byEmail.length} match${byEmail.length === 1 ? '' : 'es'})`,
-        }).where(eq(schema.orders.orderNumber, o.orderNumber)).run()
+        }).where(eq(schema.orders.orderNumber, o.orderNumber))
         emailMatched++
         continue
       }
-      db.update(schema.orders).set({
+      await db.update(schema.orders).set({
         ssVerifyStatus: 'not_found',
         ssShipmentId: null,
         ssVerifyCheckedAt: now,
         ssVerifyError: null,
-      }).where(eq(schema.orders.orderNumber, o.orderNumber)).run()
+      }).where(eq(schema.orders.orderNumber, o.orderNumber))
       notFound++
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      db.update(schema.orders).set({
+      await db.update(schema.orders).set({
         ssVerifyStatus: 'error',
         ssVerifyCheckedAt: now,
         ssVerifyError: msg.slice(0, 500),
-      }).where(eq(schema.orders.orderNumber, o.orderNumber)).run()
+      }).where(eq(schema.orders.orderNumber, o.orderNumber))
       errors++
     }
   }

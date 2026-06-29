@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const body = (await req.json().catch(() => ({}))) as Body
 
-  const existing = db.select().from(schema.orderItems).where(eq(schema.orderItems.id, id)).get()
+  const existing = (await db.select().from(schema.orderItems).where(eq(schema.orderItems.id, id)))[0]
   if (!existing) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
 
   const patch: Partial<typeof schema.orderItems.$inferInsert> = {}
@@ -33,7 +33,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, unchanged: true })
   }
 
-  db.update(schema.orderItems).set(patch).where(eq(schema.orderItems.id, id)).run()
+  await db.update(schema.orderItems).set(patch).where(eq(schema.orderItems.id, id))
 
   // SKU-level propagation: if status flag was touched and we have a sku,
   // mirror the change to the SKU row AND every other queued/partial order_items
@@ -49,18 +49,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (statusFlagChanged) skuPatch.statusSetAt = new Date()
 
     // Ensure SKU row exists then update
-    const skuRow = db.select().from(schema.skus).where(eq(schema.skus.sku, existing.sku)).get()
+    const skuRow = (await db.select().from(schema.skus).where(eq(schema.skus.sku, existing.sku)))[0]
     if (skuRow) {
-      db.update(schema.skus).set(skuPatch).where(eq(schema.skus.sku, existing.sku)).run()
+      await db.update(schema.skus).set(skuPatch).where(eq(schema.skus.sku, existing.sku))
     } else {
-      db.insert(schema.skus).values({
+      await db.insert(schema.skus).values({
         sku: existing.sku,
         description: existing.name,
         statusFlag: skuPatch.statusFlag,
         statusPendingUntil: skuPatch.statusPendingUntil,
         statusNotes: skuPatch.statusNotes ?? '',
         statusSetAt: skuPatch.statusSetAt,
-      }).run()
+      })
     }
 
     // Cascade to other queued/partial items with the same SKU
@@ -69,11 +69,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (pendingChanged) cascadeUpdate.pendingUntil = body.pendingUntil ? new Date(body.pendingUntil) : null
     if (notesChanged) cascadeUpdate.notes = String(body.notes ?? '').slice(0, 2000)
 
-    const r = db.update(schema.orderItems)
+    const r = await db.update(schema.orderItems)
       .set(cascadeUpdate)
       .where(eq(schema.orderItems.sku, existing.sku))
-      .run()
-    propagated = r.changes
+    propagated = r.rowsAffected
   }
 
   await writeAudit({

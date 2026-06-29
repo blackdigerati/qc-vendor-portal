@@ -12,10 +12,10 @@ type Body = {
   maxLabels?: number   // hard cap on labels scanned this run (testing safety)
 }
 
-function nextBatchId(): string {
+async function nextBatchId(): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = `B-${year}-`
-  const ids = db.select({ id: schema.batches.id }).from(schema.batches).all().map(r => r.id)
+  const ids = (await db.select({ id: schema.batches.id }).from(schema.batches)).map(r => r.id)
   let max = 0
   for (const id of ids) {
     if (!id.startsWith(prefix)) continue
@@ -25,8 +25,8 @@ function nextBatchId(): string {
   return prefix + String(max + 1).padStart(4, '0')
 }
 
-function pickSinceISO(): string {
-  const cursor = db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)).get()
+async function pickSinceISO(): Promise<string> {
+  const cursor = (await db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)))[0]
   if (cursor?.lastLabelFetchAt) return cursor.lastLabelFetchAt.toISOString()
   const fallback = new Date(Date.now() - DEFAULT_LOOKBACK_HOURS * 60 * 60 * 1000)
   return fallback.toISOString()
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   const s = await requireSession()
   const body = (await req.json().catch(() => ({}))) as Body
   const overrideSince = typeof body.sinceISO === 'string' && body.sinceISO ? new Date(body.sinceISO) : null
-  const sinceISO = overrideSince ? overrideSince.toISOString() : pickSinceISO()
+  const sinceISO = overrideSince ? overrideSince.toISOString() : await pickSinceISO()
   const maxLabels = typeof body.maxLabels === 'number' && body.maxLabels > 0 ? body.maxLabels : undefined
   const usingOverride = !!overrideSince
   const fetchedAt = new Date()
@@ -59,11 +59,10 @@ export async function POST(req: Request) {
 
   // Dedupe by shipment_id; drop any shipments we've already imported into an order_item batch
   const seenShipIds = new Set(
-    db
+    (await db
       .select({ id: schema.orderItems.ssShipmentId })
       .from(schema.orderItems)
-      .where(sql`${schema.orderItems.ssShipmentId} IS NOT NULL`)
-      .all()
+      .where(sql`${schema.orderItems.ssShipmentId} IS NOT NULL`))
       .map(r => r.id!)
       .filter(Boolean),
   )
@@ -77,7 +76,7 @@ export async function POST(req: Request) {
 
   if (newShipIds.length === 0) {
     // Only bump cursor on a normal (non-override) run
-    if (!usingOverride) upsertCursor(fetchedAt)
+    if (!usingOverride) await upsertCursor(fetchedAt)
     return NextResponse.json({
       batchId: null,
       sinceISO,
@@ -100,14 +99,14 @@ export async function POST(req: Request) {
     unmatchedItems: [] as { orderNumber: string; sku: string; qty: number }[],
   }
 
-  const batchId = nextBatchId()
-  db.insert(schema.batches).values({
+  const batchId = await nextBatchId()
+  await db.insert(schema.batches).values({
     id: batchId,
     createdBy: s.userId,
     status: 'pending',
     source: 'ss_label_sync',
     labelFetchAt: fetchedAt,
-  }).run()
+  })
 
   for (const shipmentId of newShipIds) {
     const ship = await getShipment(shipmentId)
@@ -120,15 +119,14 @@ export async function POST(req: Request) {
       summary.unmatchedShipments.push({ shipmentId, reason: 'no external_shipment_id on shipment' })
       continue
     }
-    const dbOrder = db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber)).get()
+    const dbOrder = (await db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber)))[0]
     if (!dbOrder) {
       summary.unmatchedShipments.push({ shipmentId, reason: `order #${orderNumber} not in portal DB — pull it first` })
       continue
     }
 
-    const queuedItems = db.select().from(schema.orderItems)
-      .where(sql`${schema.orderItems.orderNumber} = ${orderNumber}`)
-      .all()
+    const queuedItems = (await db.select().from(schema.orderItems)
+      .where(sql`${schema.orderItems.orderNumber} = ${orderNumber}`))
       .filter(i => i.status === 'queued')
 
     const shipItems: SSShipmentItem[] = ship.items || []
@@ -160,23 +158,23 @@ export async function POST(req: Request) {
         continue
       }
       matchedQueueIds.add(candidate.id)
-      db.update(schema.orderItems).set({
+      await db.update(schema.orderItems).set({
         status: 'shipped',
         batchId,
         ssShipmentId: shipmentId,
-      }).where(eq(schema.orderItems.id, candidate.id)).run()
+      }).where(eq(schema.orderItems.id, candidate.id))
       summary.itemsBatched++
     }
 
     // Recompute parent order status
     const stillQueued = queuedItems.filter(qi => !matchedQueueIds.has(qi.id)).length
     if (stillQueued === 0 && matchedQueueIds.size > 0) {
-      db.update(schema.orders).set({ status: 'shipped' })
-        .where(eq(schema.orders.orderNumber, orderNumber)).run()
+      await db.update(schema.orders).set({ status: 'shipped' })
+        .where(eq(schema.orders.orderNumber, orderNumber))
       summary.fullyShippedOrders.add(orderNumber)
     } else if (matchedQueueIds.size > 0) {
-      db.update(schema.orders).set({ status: 'partial' })
-        .where(eq(schema.orders.orderNumber, orderNumber)).run()
+      await db.update(schema.orders).set({ status: 'partial' })
+        .where(eq(schema.orders.orderNumber, orderNumber))
       summary.partialOrders.add(orderNumber)
     }
 
@@ -185,16 +183,16 @@ export async function POST(req: Request) {
       summary.shipmentsImported++
       // Promote ssShipmentId to the order itself if not yet set
       if (!dbOrder.ssShipmentId) {
-        db.update(schema.orders).set({ ssShipmentId: shipmentId })
-          .where(eq(schema.orders.orderNumber, orderNumber)).run()
+        await db.update(schema.orders).set({ ssShipmentId: shipmentId })
+          .where(eq(schema.orders.orderNumber, orderNumber))
       }
     }
   }
 
   // If nothing actually got into the batch (every shipment unmatched), drop the empty batch
   if (summary.itemsBatched === 0) {
-    db.delete(schema.batches).where(eq(schema.batches.id, batchId)).run()
-    if (!usingOverride) upsertCursor(fetchedAt)
+    await db.delete(schema.batches).where(eq(schema.batches.id, batchId))
+    if (!usingOverride) await upsertCursor(fetchedAt)
     return NextResponse.json({
       batchId: null,
       sinceISO,
@@ -228,13 +226,13 @@ export async function POST(req: Request) {
   }
 
   // Roll up batch status
-  db.update(schema.batches).set({
+  await db.update(schema.batches).set({
     status: 'shipped',
-  }).where(eq(schema.batches.id, batchId)).run()
+  }).where(eq(schema.batches.id, batchId))
 
   // Only advance the cursor on a normal (non-override) run, so testers
   // can re-fetch historical ranges without losing their place.
-  if (!usingOverride) upsertCursor(fetchedAt)
+  if (!usingOverride) await upsertCursor(fetchedAt)
 
   const payload = {
     batchId,
@@ -264,14 +262,13 @@ export async function POST(req: Request) {
   return NextResponse.json(payload)
 }
 
-function upsertCursor(at: Date) {
-  const existing = db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)).get()
+async function upsertCursor(at: Date) {
+  const existing = (await db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)))[0]
   if (existing) {
-    db.update(schema.ssSyncCursor)
+    await db.update(schema.ssSyncCursor)
       .set({ lastLabelFetchAt: at, updatedAt: at })
       .where(eq(schema.ssSyncCursor.id, 1))
-      .run()
   } else {
-    db.insert(schema.ssSyncCursor).values({ id: 1, lastLabelFetchAt: at }).run()
+    await db.insert(schema.ssSyncCursor).values({ id: 1, lastLabelFetchAt: at })
   }
 }

@@ -14,33 +14,29 @@ export type LedgerSnapshot = {
 // 'approved' is legacy (old approval flow) — treat as received for back-compat.
 const RECEIVED_SQL = sql`${schema.payments.status} IN ('received', 'approved')`
 
-export function getLedger(): LedgerSnapshot {
-  const ob = db.select().from(schema.ledgerOpeningBalance).get()
+export async function getLedger(): Promise<LedgerSnapshot> {
+  const ob = (await db.select().from(schema.ledgerOpeningBalance))[0]
   const openingBalanceCents = ob?.amountCents ?? 0
 
-  const invSum = db
+  const invSum = (await db
     .select({ s: sql<number>`coalesce(sum(${schema.invoices.totalCents}), 0)` })
-    .from(schema.invoices)
-    .get()?.s ?? 0
+    .from(schema.invoices))[0]?.s ?? 0
 
-  const paySum = db
+  const paySum = (await db
     .select({ s: sql<number>`coalesce(sum(${schema.payments.amountCents}), 0)` })
     .from(schema.payments)
-    .where(RECEIVED_SQL)
-    .get()?.s ?? 0
+    .where(RECEIVED_SQL))[0]?.s ?? 0
 
-  const allocSum = db
+  const allocSum = (await db
     .select({ s: sql<number>`coalesce(sum(${schema.paymentAllocations.amountCents}), 0)` })
     .from(schema.paymentAllocations)
     .innerJoin(schema.payments, eq(schema.paymentAllocations.paymentId, schema.payments.id))
-    .where(RECEIVED_SQL)
-    .get()?.s ?? 0
+    .where(RECEIVED_SQL))[0]?.s ?? 0
 
-  const openInvoices = db
+  const openInvoices = (await db
     .select({ c: sql<number>`count(*)` })
     .from(schema.invoices)
-    .where(ne(schema.invoices.status, 'paid'))
-    .get()?.c ?? 0
+    .where(ne(schema.invoices.status, 'paid')))[0]?.c ?? 0
 
   return {
     openingBalanceCents,
@@ -53,30 +49,28 @@ export function getLedger(): LedgerSnapshot {
 }
 
 /** Recompute invoice.status based on RECEIVED-payment allocations only. */
-export function recomputeInvoiceStatus(invoiceId: string) {
-  const inv = db.select().from(schema.invoices).where(eq(schema.invoices.id, invoiceId)).get()
+export async function recomputeInvoiceStatus(invoiceId: string) {
+  const inv = (await db.select().from(schema.invoices).where(eq(schema.invoices.id, invoiceId)))[0]
   if (!inv) return
-  const allocated = db
+  const allocated = (await db
     .select({ s: sql<number>`coalesce(sum(${schema.paymentAllocations.amountCents}), 0)` })
     .from(schema.paymentAllocations)
     .innerJoin(schema.payments, eq(schema.paymentAllocations.paymentId, schema.payments.id))
-    .where(sql`${schema.paymentAllocations.invoiceId} = ${invoiceId} AND ${schema.payments.status} IN ('received', 'approved')`)
-    .get()?.s ?? 0
+    .where(sql`${schema.paymentAllocations.invoiceId} = ${invoiceId} AND ${schema.payments.status} IN ('received', 'approved')`))[0]?.s ?? 0
   let status: 'open' | 'partial' | 'paid' = 'open'
   if (allocated >= inv.totalCents) status = 'paid'
   else if (allocated > 0) status = 'partial'
-  db.update(schema.invoices).set({ status }).where(eq(schema.invoices.id, invoiceId)).run()
+  await db.update(schema.invoices).set({ status }).where(eq(schema.invoices.id, invoiceId))
 }
 
 /** Open balance on an invoice, considering only RECEIVED payments. */
-export function invoiceOpenBalance(invoiceId: string): number {
-  const inv = db.select().from(schema.invoices).where(eq(schema.invoices.id, invoiceId)).get()
+export async function invoiceOpenBalance(invoiceId: string): Promise<number> {
+  const inv = (await db.select().from(schema.invoices).where(eq(schema.invoices.id, invoiceId)))[0]
   if (!inv) return 0
-  const allocated = db
+  const allocated = (await db
     .select({ s: sql<number>`coalesce(sum(${schema.paymentAllocations.amountCents}), 0)` })
     .from(schema.paymentAllocations)
     .innerJoin(schema.payments, eq(schema.paymentAllocations.paymentId, schema.payments.id))
-    .where(sql`${schema.paymentAllocations.invoiceId} = ${invoiceId} AND ${schema.payments.status} IN ('received', 'approved')`)
-    .get()?.s ?? 0
+    .where(sql`${schema.paymentAllocations.invoiceId} = ${invoiceId} AND ${schema.payments.status} IN ('received', 'approved')`))[0]?.s ?? 0
   return Math.max(0, inv.totalCents - allocated)
 }

@@ -13,14 +13,14 @@ export async function POST(req: Request) {
   if (!orderNumber) return NextResponse.json({ error: 'Order # required' }, { status: 400 })
 
   const id = newId('rt')
-  db.insert(schema.returns).values({
+  await db.insert(schema.returns).values({
     id,
     orderNumber,
     reason,
     notes,
     loggedBy: s.userId,
     status: 'logged',
-  }).run()
+  })
 
   await writeAudit({
     actor: s.userId,

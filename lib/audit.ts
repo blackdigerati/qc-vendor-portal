@@ -8,12 +8,12 @@ export async function writeAudit(input: {
   action: string
   payload?: unknown
 }) {
-  db.insert(schema.auditLog).values({
+  await db.insert(schema.auditLog).values({
     id: newId('al'),
     actor: input.actor,
     entityType: input.entityType,
     entityId: input.entityId,
     action: input.action,
     payloadJson: JSON.stringify(input.payload ?? {}),
-  }).run()
+  })
 }

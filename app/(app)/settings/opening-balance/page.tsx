@@ -5,7 +5,7 @@ import { OpeningBalanceForm } from './opening-balance-form'
 export const dynamic = 'force-dynamic'
 
 export default async function OpeningBalancePage() {
-  const ob = db.select().from(schema.ledgerOpeningBalance).get()
+  const ob = (await db.select().from(schema.ledgerOpeningBalance))[0]
   return (
     <div>
       <p className="text-sm text-slate-500 mb-4">

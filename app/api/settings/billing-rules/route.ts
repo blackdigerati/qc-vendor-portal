@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   if (handlingThresholdCents < 0 || handlingPerItemCents < 0) {
     return NextResponse.json({ error: 'Values must be non-negative' }, { status: 400 })
   }
-  upsertBillingRule({ handlingThresholdCents, handlingPerItemCents }, s.userId)
+  await upsertBillingRule({ handlingThresholdCents, handlingPerItemCents }, s.userId)
   await writeAudit({
     actor: s.userId,
     entityType: 'settings',

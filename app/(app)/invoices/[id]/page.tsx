@@ -18,18 +18,18 @@ function statusPill(s: string) {
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const invoice = db.select().from(schema.invoices).where(eq(schema.invoices.id, id)).get()
+  const invoice = (await db.select().from(schema.invoices).where(eq(schema.invoices.id, id)))[0]
   if (!invoice) notFound()
 
-  const lines = db.select().from(schema.invoiceLines).where(eq(schema.invoiceLines.invoiceId, id)).all()
-  const allocs = db.select().from(schema.paymentAllocations).where(eq(schema.paymentAllocations.invoiceId, id)).all()
+  const lines = await db.select().from(schema.invoiceLines).where(eq(schema.invoiceLines.invoiceId, id))
+  const allocs = await db.select().from(schema.paymentAllocations).where(eq(schema.paymentAllocations.invoiceId, id))
   const payIds = [...new Set(allocs.map(a => a.paymentId))]
   const payments = payIds.length
-    ? db.select().from(schema.payments).all().filter(p => payIds.includes(p.id))
+    ? (await db.select().from(schema.payments)).filter(p => payIds.includes(p.id))
     : []
   const payMap = new Map(payments.map(p => [p.id, p]))
 
-  const openCents = invoiceOpenBalance(id)
+  const openCents = await invoiceOpenBalance(id)
   const paidCents = invoice.totalCents - openCents
 
   return (

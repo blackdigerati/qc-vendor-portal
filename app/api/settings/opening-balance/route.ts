@@ -13,14 +13,13 @@ export async function POST(req: Request) {
 
   if (amount < 0) return NextResponse.json({ error: 'Amount cannot be negative' }, { status: 400 })
 
-  const existing = db.select().from(schema.ledgerOpeningBalance).get()
+  const existing = (await db.select().from(schema.ledgerOpeningBalance))[0]
   if (existing) {
-    db.update(schema.ledgerOpeningBalance)
+    await db.update(schema.ledgerOpeningBalance)
       .set({ amountCents: amount, asOf, setBy: s.userId, setAt: new Date() })
       .where(eq(schema.ledgerOpeningBalance.id, 1))
-      .run()
   } else {
-    db.insert(schema.ledgerOpeningBalance).values({ id: 1, amountCents: amount, asOf, setBy: s.userId }).run()
+    await db.insert(schema.ledgerOpeningBalance).values({ id: 1, amountCents: amount, asOf, setBy: s.userId })
   }
 
   await writeAudit({ actor: s.userId, entityType: 'settings', entityId: 'opening_balance', action: 'opening_balance.set', payload: { amount, asOf: asOf.toISOString() } })

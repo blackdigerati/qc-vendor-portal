@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   if (!email || !password) {
     return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
   }
-  const user = db.select().from(schema.users).where(eq(schema.users.email, String(email).toLowerCase())).get()
+  const user = (await db.select().from(schema.users).where(eq(schema.users.email, String(email).toLowerCase())))[0]
   if (!user) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   const ok = await bcrypt.compare(String(password), user.passwordHash)
   if (!ok) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })

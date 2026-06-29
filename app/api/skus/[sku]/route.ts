@@ -18,7 +18,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ sku: s
   const { sku } = await params
   const body = (await req.json().catch(() => ({}))) as Body
 
-  let existing = db.select().from(schema.skus).where(eq(schema.skus.sku, sku)).get()
+  let existing = (await db.select().from(schema.skus).where(eq(schema.skus.sku, sku)))[0]
 
   const patch: Partial<typeof schema.skus.$inferInsert> = { updatedAt: new Date() }
   if ('description' in body) patch.description = String(body.description ?? '')
@@ -29,17 +29,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ sku: s
 
   if (!existing) {
     // Auto-create on first save (covers SKUs that came in via CSV but never existed in DB)
-    db.insert(schema.skus).values({
+    await db.insert(schema.skus).values({
       sku,
       description: patch.description ?? '',
       productId: patch.productId ?? null,
       baseCostCents: patch.baseCostCents ?? 0,
       shippingAddonCents: patch.shippingAddonCents ?? 0,
       active: patch.active ?? true,
-    }).run()
-    existing = db.select().from(schema.skus).where(eq(schema.skus.sku, sku)).get()
+    })
+    existing = (await db.select().from(schema.skus).where(eq(schema.skus.sku, sku)))[0]
   } else {
-    db.update(schema.skus).set(patch).where(eq(schema.skus.sku, sku)).run()
+    await db.update(schema.skus).set(patch).where(eq(schema.skus.sku, sku))
   }
 
   await writeAudit({

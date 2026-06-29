@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   for (const a of allocations) {
     const amt = toCents(a.amount)
     if (amt <= 0 || !a.invoice_id) continue
-    const open = invoiceOpenBalance(String(a.invoice_id))
+    const open = await invoiceOpenBalance(String(a.invoice_id))
     if (open <= 0) continue
     const useAmt = Math.min(amt, open)
     cleanAllocs.push({ invoiceId: String(a.invoice_id), amountCents: useAmt })
@@ -38,23 +38,23 @@ export async function POST(req: Request) {
 
   const id = newId('pay')
 
-  db.insert(schema.payments).values({
+  await db.insert(schema.payments).values({
     id,
     amountCents: amount,
     paidOn,
     refNote: ref,
     recordedBy: s.userId,
     status: 'sent',
-  }).run()
+  })
 
   // Allocations are written now but only "count" once the payment is received.
   for (const a of cleanAllocs) {
-    db.insert(schema.paymentAllocations).values({
+    await db.insert(schema.paymentAllocations).values({
       id: newId('pa'),
       paymentId: id,
       invoiceId: a.invoiceId,
       amountCents: a.amountCents,
-    }).run()
+    })
   }
 
   await writeAudit({

@@ -28,9 +28,9 @@ export async function POST(req: Request) {
 
   // Upsert each
   for (const r of clean) {
-    const existing = db.select().from(schema.skus).where(inArray(schema.skus.sku, [r.sku])).get()
+    const existing = (await db.select().from(schema.skus).where(inArray(schema.skus.sku, [r.sku])))[0]
     if (existing) {
-      db.update(schema.skus)
+      await db.update(schema.skus)
         .set({
           description: r.description,
           baseCostCents: r.baseCostCents,
@@ -39,9 +39,8 @@ export async function POST(req: Request) {
           updatedAt: new Date(),
         })
         .where(inArray(schema.skus.sku, [r.sku]))
-        .run()
     } else {
-      db.insert(schema.skus).values(r).run()
+      await db.insert(schema.skus).values(r)
     }
   }
 
@@ -49,9 +48,9 @@ export async function POST(req: Request) {
   const keepSkus = clean.map(r => r.sku)
   let deleted = 0
   if (keepSkus.length > 0) {
-    const toDelete = db.select().from(schema.skus).where(notInArray(schema.skus.sku, keepSkus)).all()
+    const toDelete = await db.select().from(schema.skus).where(notInArray(schema.skus.sku, keepSkus))
     deleted = toDelete.length
-    if (toDelete.length) db.delete(schema.skus).where(notInArray(schema.skus.sku, keepSkus)).run()
+    if (toDelete.length) await db.delete(schema.skus).where(notInArray(schema.skus.sku, keepSkus))
   }
 
   await writeAudit({

@@ -37,19 +37,19 @@ export async function pullOrders(
 
   // In-memory cache of known SKUs (grows as we auto-create within this pull)
   const skuCache = new Set(
-    db.select({ sku: schema.skus.sku }).from(schema.skus).all().map(r => r.sku),
+    (await db.select({ sku: schema.skus.sku }).from(schema.skus)).map(r => r.sku),
   )
   const created = new Set<string>()
 
   for (const [orderNumber, items] of byOrder) {
     const head = items[0]
-    const existing = db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber)).get()
+    const existing = (await db.select().from(schema.orders).where(eq(schema.orders.orderNumber, orderNumber)))[0]
     if (existing) {
       result.ordersSkipped++
       continue
     }
     const urgent = urgentSet.has(orderNumber) || items.some(i => detectUrgent(i.notes))
-    db.insert(schema.orders).values({
+    await db.insert(schema.orders).values({
       orderNumber,
       email: head.email,
       firstName: head.firstName,
@@ -70,7 +70,7 @@ export async function pullOrders(
       urgent,
       source: opts.source,
       status: 'queued',
-    }).run()
+    })
     result.ordersInserted++
     if (urgent) result.urgentTotal++
 
@@ -79,17 +79,17 @@ export async function pullOrders(
       // (the CSV could carry a typo / stale cost — Settings is authoritative
       // once a SKU has been touched).
       if (it.sku && !skuCache.has(it.sku)) {
-        db.insert(schema.skus).values({
+        await db.insert(schema.skus).values({
           sku: it.sku,
           description: it.name,
           baseCostCents: it.costOfGoodsCents,
           active: true,
-        }).run()
+        })
         skuCache.add(it.sku)
         created.add(it.sku)
       }
 
-      db.insert(schema.orderItems).values({
+      await db.insert(schema.orderItems).values({
         id: newId('oi'),
         orderNumber,
         sku: it.sku,
@@ -97,7 +97,7 @@ export async function pullOrders(
         qty: it.qty,
         costOfGoodsCents: it.costOfGoodsCents,
         status: 'queued',
-      }).run()
+      })
       result.itemsInserted++
     }
   }

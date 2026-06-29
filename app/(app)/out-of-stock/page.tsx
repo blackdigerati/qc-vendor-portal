@@ -5,15 +5,14 @@ import { OosTable, type OosRow } from './oos-table'
 export const dynamic = 'force-dynamic'
 
 export default async function OutOfStockPage() {
-  const flaggedSkus = db
+  const flaggedSkus = await db
     .select()
     .from(schema.skus)
     .where(isNotNull(schema.skus.statusFlag))
-    .all()
 
   const skuCodes = flaggedSkus.map(s => s.sku)
   const counts = skuCodes.length
-    ? db
+    ? await db
         .select({
           sku: schema.orderItems.sku,
           c: sql<number>`count(*)`,
@@ -21,7 +20,6 @@ export default async function OutOfStockPage() {
         .from(schema.orderItems)
         .where(sql`${schema.orderItems.sku} IN (${sql.join(skuCodes.map(s => sql`${s}`), sql`, `)}) AND ${schema.orderItems.status} IN ('queued','partial','batched')`)
         .groupBy(schema.orderItems.sku)
-        .all()
     : []
   const countBySku = new Map(counts.map(r => [r.sku, r.c]))
 

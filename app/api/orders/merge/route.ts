@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   }
 
   const allNums = [keep, ...mergeList]
-  const allOrders = db.select().from(schema.orders).where(inArray(schema.orders.orderNumber, allNums)).all()
+  const allOrders = await db.select().from(schema.orders).where(inArray(schema.orders.orderNumber, allNums))
   const orderMap = new Map(allOrders.map(o => [o.orderNumber, o]))
 
   const keepOrder = orderMap.get(keep)
@@ -78,21 +78,20 @@ export async function POST(req: Request) {
 
     // Move all order_items from the absorbed order onto the survivor.
     // Stamp mergedFromOrderNumber so the UI can show "— from #merge" provenance.
-    const movedItems = db.update(schema.orderItems)
+    const movedItems = await db.update(schema.orderItems)
       .set({ orderNumber: keep, mergedFromOrderNumber: merge })
       .where(eq(schema.orderItems.orderNumber, merge))
-      .run()
 
-    db.update(schema.orders).set({
+    await db.update(schema.orders).set({
       mergedIntoOrderNumber: keep,
       status: 'cancelled',
-    }).where(eq(schema.orders.orderNumber, merge)).run()
+    }).where(eq(schema.orders.orderNumber, merge))
 
     results.push({
       orderNumber: merge,
       ok: true,
       fallbackUsed,
-      detail: `${detail}; moved ${movedItems.changes} item(s) to survivor`,
+      detail: `${detail}; moved ${movedItems.rowsAffected} item(s) to survivor`,
     })
   }
 

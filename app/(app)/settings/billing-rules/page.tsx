@@ -4,7 +4,7 @@ import { BillingRulesForm } from './form'
 export const dynamic = 'force-dynamic'
 
 export default async function BillingRulesPage() {
-  const rule = getBillingRule()
+  const rule = await getBillingRule()
   return (
     <div>
       <p className="text-sm text-slate-600 mb-4">

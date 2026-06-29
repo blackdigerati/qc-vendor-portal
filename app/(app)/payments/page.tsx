@@ -10,8 +10,8 @@ const RECEIVED = ['received', 'approved'] as const
 
 export default async function PaymentsPage() {
   await requireSession()
-  const payments = db.select().from(schema.payments).orderBy(desc(schema.payments.paidOn)).all()
-  const allocs = db.select().from(schema.paymentAllocations).all()
+  const payments = await db.select().from(schema.payments).orderBy(desc(schema.payments.paidOn))
+  const allocs = await db.select().from(schema.paymentAllocations)
   const allocsByPayment = new Map<string, typeof allocs>()
   for (const a of allocs) {
     const list = allocsByPayment.get(a.paymentId) || []

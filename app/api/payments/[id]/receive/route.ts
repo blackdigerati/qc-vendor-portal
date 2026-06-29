@@ -9,21 +9,21 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const s = await requireSession()
   const { id } = await params
 
-  const p = db.select().from(schema.payments).where(eq(schema.payments.id, id)).get()
+  const p = (await db.select().from(schema.payments).where(eq(schema.payments.id, id)))[0]
   if (!p) return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
   if (p.status !== 'sent') return NextResponse.json({ error: `Already ${p.status}` }, { status: 409 })
 
   const now = new Date()
-  db.update(schema.payments).set({
+  await db.update(schema.payments).set({
     status: 'received',
     approvedBy: s.userId,
     approvedAt: now,
-  }).where(eq(schema.payments.id, id)).run()
+  }).where(eq(schema.payments.id, id))
 
   // Apply allocations now (they were written at send time but didn't count)
-  const allocs = db.select().from(schema.paymentAllocations)
-    .where(eq(schema.paymentAllocations.paymentId, id)).all()
-  for (const a of allocs) recomputeInvoiceStatus(a.invoiceId)
+  const allocs = await db.select().from(schema.paymentAllocations)
+    .where(eq(schema.paymentAllocations.paymentId, id))
+  for (const a of allocs) await recomputeInvoiceStatus(a.invoiceId)
 
   await writeAudit({
     actor: s.userId,

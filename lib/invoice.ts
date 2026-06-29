@@ -7,10 +7,10 @@ import { fromCents } from './money'
 import { computeHandlingPerItem } from './billing-rules'
 import { getBillingRule } from './billing-rules-db'
 
-function nextInvoiceId(): string {
+async function nextInvoiceId(): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = `INV-${year}-`
-  const ids = db.select({ id: schema.invoices.id }).from(schema.invoices).all().map(r => r.id)
+  const ids = (await db.select({ id: schema.invoices.id }).from(schema.invoices)).map(r => r.id)
   let max = 0
   for (const id of ids) {
     if (!id.startsWith(prefix)) continue
@@ -31,27 +31,26 @@ export type InvoiceCreateResult = {
  * Cross-checks each line against the CSV's Cost of Goods; mismatch becomes a warning.
  */
 export async function createInvoiceForBatch(batchId: string, actor?: string): Promise<InvoiceCreateResult | { error: string }> {
-  const batch = db.select().from(schema.batches).where(eq(schema.batches.id, batchId)).get()
+  const batch = (await db.select().from(schema.batches).where(eq(schema.batches.id, batchId)))[0]
   if (!batch) return { error: 'Batch not found' }
   if (batch.invoiceId) {
-    const inv = db.select().from(schema.invoices).where(eq(schema.invoices.id, batch.invoiceId)).get()
+    const inv = (await db.select().from(schema.invoices).where(eq(schema.invoices.id, batch.invoiceId)))[0]
     return inv ? { invoiceId: inv.id, totalCents: inv.totalCents, warnings: [] } : { error: 'Invoice missing' }
   }
 
-  const items = db.select().from(schema.orderItems).where(eq(schema.orderItems.batchId, batchId)).all()
+  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.batchId, batchId))
   if (items.length === 0) return { error: 'No items in batch' }
 
-  const rule = getBillingRule()
+  const rule = await getBillingRule()
 
-  const skuRows = db
+  const skuRows = await db
     .select()
     .from(schema.skus)
     .where(inArray(schema.skus.sku, [...new Set(items.map(i => i.sku).filter(Boolean))]))
-    .all()
   const skuMap = new Map(skuRows.map(r => [r.sku, r]))
 
   const warnings: string[] = []
-  const invoiceId = nextInvoiceId()
+  const invoiceId = await nextInvoiceId()
   let total = 0
   const lines: (typeof schema.invoiceLines.$inferInsert)[] = []
 
@@ -92,14 +91,14 @@ export async function createInvoiceForBatch(batchId: string, actor?: string): Pr
     })
   }
 
-  db.insert(schema.invoices).values({
+  await db.insert(schema.invoices).values({
     id: invoiceId,
     batchId,
     totalCents: total,
     status: 'open',
-  }).run()
-  for (const ln of lines) db.insert(schema.invoiceLines).values(ln).run()
-  db.update(schema.batches).set({ status: 'invoiced', invoiceId }).where(eq(schema.batches.id, batchId)).run()
+  })
+  for (const ln of lines) await db.insert(schema.invoiceLines).values(ln)
+  await db.update(schema.batches).set({ status: 'invoiced', invoiceId }).where(eq(schema.batches.id, batchId))
 
   await writeAudit({
     actor,

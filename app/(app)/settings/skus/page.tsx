@@ -5,7 +5,7 @@ import { SkusEditor, type SkuRow } from './skus-editor'
 export const dynamic = 'force-dynamic'
 
 export default async function SkusPage() {
-  const rows = db.select().from(schema.skus).orderBy(asc(schema.skus.sku)).all()
+  const rows = await db.select().from(schema.skus).orderBy(asc(schema.skus.sku))
   const data: SkuRow[] = rows.map(r => ({
     sku: r.sku,
     description: r.description,

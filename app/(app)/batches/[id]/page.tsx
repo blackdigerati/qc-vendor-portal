@@ -23,24 +23,24 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
   const { id } = await params
   const session = await getSession()
   const isAdmin = session.role === 'admin'
-  const batch = db.select().from(schema.batches).where(eq(schema.batches.id, id)).get()
+  const batch = (await db.select().from(schema.batches).where(eq(schema.batches.id, id)))[0]
   if (!batch) notFound()
 
-  const items = db.select().from(schema.orderItems).where(eq(schema.orderItems.batchId, id)).all()
+  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.batchId, id))
   const orderNums = [...new Set(items.map(i => i.orderNumber))]
   const orders = orderNums.length
-    ? db.select().from(schema.orders).where(inArray(schema.orders.orderNumber, orderNums)).all()
+    ? await db.select().from(schema.orders).where(inArray(schema.orders.orderNumber, orderNums))
     : []
   const orderMap = new Map(orders.map(o => [o.orderNumber, o]))
 
   const skuList = [...new Set(items.map(i => i.sku).filter(Boolean))]
   const skuRows = skuList.length
-    ? db.select().from(schema.skus).where(inArray(schema.skus.sku, skuList)).all()
+    ? await db.select().from(schema.skus).where(inArray(schema.skus.sku, skuList))
     : []
   const skuMap = new Map(skuRows.map(r => [r.sku, r]))
 
   const invoice = batch.invoiceId
-    ? db.select().from(schema.invoices).where(eq(schema.invoices.id, batch.invoiceId)).get()
+    ? (await db.select().from(schema.invoices).where(eq(schema.invoices.id, batch.invoiceId)))[0]
     : null
 
   const initialLines: BatchLine[] = items.map(it => {
@@ -104,7 +104,7 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
         invoiceTotalCents={invoice?.totalCents ?? null}
         isAdmin={isAdmin}
         mergedFromByOrder={Object.fromEntries(mergedFromByOrder)}
-        billingRule={getBillingRule()}
+        billingRule={await getBillingRule()}
       />
     </div>
   )

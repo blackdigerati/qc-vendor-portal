@@ -3,8 +3,8 @@ import { db, schema } from '@/db/client'
 import { type BillingRule, DEFAULT_HANDLING_PER_ITEM_CENTS, DEFAULT_HANDLING_THRESHOLD_CENTS } from './billing-rules'
 
 /** Server-only: read the current billing rule from DB, falling back to defaults. */
-export function getBillingRule(): BillingRule {
-  const row = db.select().from(schema.billingSettings).where(eq(schema.billingSettings.id, 1)).get()
+export async function getBillingRule(): Promise<BillingRule> {
+  const row = (await db.select().from(schema.billingSettings).where(eq(schema.billingSettings.id, 1)))[0]
   if (row) {
     return {
       handlingThresholdCents: row.handlingThresholdCents,
@@ -17,22 +17,22 @@ export function getBillingRule(): BillingRule {
   }
 }
 
-export function upsertBillingRule(rule: BillingRule, userId: string) {
-  const existing = db.select().from(schema.billingSettings).where(eq(schema.billingSettings.id, 1)).get()
+export async function upsertBillingRule(rule: BillingRule, userId: string) {
+  const existing = (await db.select().from(schema.billingSettings).where(eq(schema.billingSettings.id, 1)))[0]
   const now = new Date()
   if (existing) {
-    db.update(schema.billingSettings).set({
+    await db.update(schema.billingSettings).set({
       handlingThresholdCents: rule.handlingThresholdCents,
       handlingPerItemCents: rule.handlingPerItemCents,
       updatedAt: now,
       updatedBy: userId,
-    }).where(eq(schema.billingSettings.id, 1)).run()
+    }).where(eq(schema.billingSettings.id, 1))
   } else {
-    db.insert(schema.billingSettings).values({
+    await db.insert(schema.billingSettings).values({
       id: 1,
       handlingThresholdCents: rule.handlingThresholdCents,
       handlingPerItemCents: rule.handlingPerItemCents,
       updatedBy: userId,
-    }).run()
+    })
   }
 }
