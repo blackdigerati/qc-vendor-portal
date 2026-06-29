@@ -162,6 +162,14 @@ export const billingSettings = sqliteTable('billing_settings', {
   updatedBy: text('updated_by').references(() => users.id),
 })
 
+export const magicTokens = sqliteTable('magic_tokens', {
+  token: text('token').primaryKey(),
+  email: text('email').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  usedAt: integer('used_at', { mode: 'timestamp' }),
+})
+
 export const returns = sqliteTable('returns', {
   id: text('id').primaryKey(),
   orderNumber: text('order_number').notNull(),

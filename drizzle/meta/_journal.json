@@ -8,6 +8,13 @@
       "when": 1782738690119,
       "tag": "0000_oval_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1782739838150,
+      "tag": "0001_lazy_doomsday",
+      "breakpoints": true
     }
   ]
 }
