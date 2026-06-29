@@ -25,7 +25,15 @@ export type BatchLine = {
   mergedFromOrderNumber: string | null
 }
 
-function EditLineMenu({ batchId, line }: { batchId: string; line: BatchLine }) {
+function EditLineMenu({
+  batchId,
+  line,
+  onCogSaved,
+}: {
+  batchId: string
+  line: BatchLine
+  onCogSaved: (sku: string, newBaseCost: string) => void
+}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'reduce' | 'remove'>(line.qty > 1 ? 'reduce' : 'remove')
@@ -33,6 +41,30 @@ function EditLineMenu({ batchId, line }: { batchId: string; line: BatchLine }) {
   const [reason, setReason] = useState('')
   const [bounceBack, setBounceBack] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [cog, setCog] = useState(line.baseCost)
+  const [savingCog, setSavingCog] = useState(false)
+
+  // Reset cog input when the line refreshes from the server
+  useEffect(() => { setCog(line.baseCost) }, [line.baseCost])
+
+  async function saveCog() {
+    if (!line.sku) { toast.error('Cannot save COG — SKU is blank on this line'); return }
+    if (cog === line.baseCost) return
+    setSavingCog(true)
+    const r = await fetch(`/api/skus/${encodeURIComponent(line.sku)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseCost: cog, description: line.name }),
+    })
+    setSavingCog(false)
+    if (!r.ok) {
+      const { error } = await r.json().catch(() => ({ error: 'Save failed' }))
+      toast.error(error || `SKU ${line.sku} save failed`)
+      return
+    }
+    onCogSaved(line.sku, cog)
+    toast.success(`COG for ${line.sku} saved`)
+  }
 
   async function submit() {
     setBusy(true)
@@ -84,8 +116,7 @@ function EditLineMenu({ batchId, line }: { batchId: string; line: BatchLine }) {
           <DialogHeader>
             <DialogTitle>Edit batch line</DialogTitle>
             <DialogDescription>
-              Use this if the label was printed but the item didn&apos;t actually ship (out-of-stock at pack time, etc.).
-              The remainder bounces back to the queue so it can ship later.
+              Adjust COG, reduce qty, or remove this line (e.g. label printed but item didn&apos;t actually ship).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-[13px]">
@@ -94,6 +125,35 @@ function EditLineMenu({ batchId, line }: { batchId: string; line: BatchLine }) {
               <div className="text-slate-900">{line.name}</div>
               <div className="text-[12px] text-slate-600 mt-0.5">Order #{line.orderNumber} · qty {line.qty}</div>
             </div>
+
+            <div className="border border-slate-200 rounded-md p-3">
+              <Label htmlFor="cog" className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Cost of goods (per unit)</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  id="cog"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cog}
+                  onChange={e => setCog(e.target.value)}
+                  className="h-8 text-right tabular-nums"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={saveCog}
+                  disabled={savingCog || cog === line.baseCost}
+                >
+                  {savingCog ? 'Saving…' : 'Save COG'}
+                </Button>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Updates the SKU catalog. New value applies to this batch and any future invoices using this SKU.
+              </p>
+            </div>
+
+            <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold pt-1">Adjust quantity</div>
 
             <div className="flex gap-2">
               <button
@@ -335,17 +395,8 @@ export function BatchLineEditor({
                           )}
                         </td>
                         <td className="px-3 py-1 text-right tabular-nums">{l.qty}</td>
-                        <td className="px-3 py-1 text-right">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={l.baseCost}
-                            disabled={readOnly}
-                            onChange={e => patchLine(l.orderItemId, { baseCost: e.target.value })}
-                            onBlur={() => !readOnly && saveSku(l)}
-                            className="h-7 text-right tabular-nums w-24 inline-block"
-                          />
+                        <td className="px-3 py-1 text-right tabular-nums text-slate-700">
+                          {fromCents(Math.round((parseFloat(l.baseCost) || 0) * 100))}
                         </td>
                         <td className="px-3 py-1 text-right tabular-nums">
                           {hasHandling ? (
@@ -359,7 +410,13 @@ export function BatchLineEditor({
                           {savingSku === l.sku ? (
                             <span className="text-slate-400">saving…</span>
                           ) : !readOnly ? (
-                            <EditLineMenu batchId={batchId} line={l} />
+                            <EditLineMenu
+                              batchId={batchId}
+                              line={l}
+                              onCogSaved={(sku, newBaseCost) => {
+                                setLines(prev => prev.map(x => x.sku === sku ? { ...x, baseCost: newBaseCost, skuInDb: true } : x))
+                              }}
+                            />
                           ) : null}
                         </td>
                       </tr>
@@ -395,7 +452,7 @@ export function BatchLineEditor({
           {isInvoiced ? (
             <>Invoice <span className="font-mono font-semibold text-slate-900">{invoiceId}</span> already issued for {fromCents(invoiceTotalCents ?? 0)} — pricing locked.</>
           ) : (
-            <>Edit COG per line (saves to SKU DB on blur). Handling auto-applies per the rule above. Eyeball the total, then create the invoice.</>
+            <>Use the per-line <b>Edit</b> action to change COG or adjust qty. Handling auto-applies per the rule. Then create the invoice.</>
           )}
         </div>
         <div className="flex items-center gap-2">
