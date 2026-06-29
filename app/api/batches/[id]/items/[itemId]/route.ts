@@ -92,7 +92,7 @@ export async function PATCH(
     // Order status: if any items still in this batch shipped, parent stays "shipped" / "partial";
     // otherwise back to queued/partial.
     const remaining = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderNumber, item.orderNumber))
-    const anyQueued = remaining.some(r => r.status === 'queued' || r.status === 'partial')
+    const anyQueued = remaining.some(r => r.status === 'queued')
     const anyShipped = remaining.some(r => r.status === 'shipped')
     const newOrderStatus = anyShipped && anyQueued ? 'partial' : anyShipped ? 'shipped' : anyQueued ? 'queued' : 'cancelled'
     await db.update(schema.orders).set({ status: newOrderStatus })
