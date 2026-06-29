@@ -31,6 +31,16 @@ export function PullOrdersDialog({
 
   const usingConfiguredSheet = !!defaultSheetId && !editingSheet
 
+  // Accept either a raw sheet ID or any Google Sheets URL. Extracts the long
+  // alphanumeric ID between `/d/` and the next slash.
+  function normalizeSheetIdInput(raw: string): string {
+    const v = raw.trim()
+    const m = v.match(/\/d\/([a-zA-Z0-9-_]+)/)
+    return m ? m[1] : v
+  }
+  const normalizedSheetId = normalizeSheetIdInput(sheetId)
+  const sheetIdLooksLikeUrl = /^https?:\/\//.test(sheetId.trim())
+
   async function pull() {
     setBusy(true)
     try {
@@ -51,7 +61,7 @@ export function PullOrdersDialog({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             source: 'sheet',
-            sheetId: sheetId || undefined,
+            sheetId: normalizedSheetId || undefined,
             tab: sheetTab || undefined,
             urgent_orders: urgent.split(/[\s,;]+/).map(s => s.trim()).filter(Boolean),
           }),
@@ -118,7 +128,7 @@ export function PullOrdersDialog({
               <>
                 <div>
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="sid">Sheet ID</Label>
+                    <Label htmlFor="sid">Sheet URL or ID</Label>
                     {defaultSheetId && (
                       <button
                         type="button"
@@ -133,7 +143,20 @@ export function PullOrdersDialog({
                       </button>
                     )}
                   </div>
-                  <Input id="sid" placeholder="Paste sheet ID" value={sheetId} onChange={e => setSheetId(e.target.value)} />
+                  <Input
+                    id="sid"
+                    placeholder="https://docs.google.com/spreadsheets/d/…/edit  —  or just the ID"
+                    value={sheetId}
+                    onChange={e => setSheetId(e.target.value)}
+                  />
+                  {sheetIdLooksLikeUrl && normalizedSheetId !== sheetId.trim() && (
+                    <p className="text-[11px] text-emerald-700 mt-1">
+                      Detected sheet ID: <span className="font-mono">{normalizedSheetId}</span>
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Paste the full Google Sheets URL — the ID is extracted automatically.
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="stab">Tab name</Label>

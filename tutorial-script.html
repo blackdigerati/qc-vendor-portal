@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>QC Vendor Portal — Tutorial Script</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    padding: 24px;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 {
+    font-size: 28px;
+    margin: 0 0 4px;
+    color: #ffffff;
+  }
+  .subtitle {
+    color: #94a3b8;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  .legend {
+    display: flex;
+    gap: 16px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 24px;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .dot {
+    width: 10px; height: 10px; border-radius: 999px; display: inline-block;
+  }
+  .clip {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-left: 4px solid #475569;
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    break-inside: avoid;
+  }
+  .clip-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 12px;
+  }
+  .clip-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .clip-meta {
+    font-size: 12px;
+    color: #94a3b8;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+  .row:last-child { margin-bottom: 0; }
+  .tag {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    min-width: 56px;
+    text-align: center;
+  }
+  .tag-show { background: #1e40af; color: #dbeafe; }
+  .tag-say  { background: #b45309; color: #fef3c7; }
+  .row-body { flex: 1; }
+  .show-text { color: #93c5fd; font-size: 14px; }
+  .say-text {
+    color: #fde68a;
+    font-size: 16px;
+    background: #44403c33;
+    border-left: 3px solid #fbbf24;
+    padding: 6px 10px;
+    border-radius: 0 6px 6px 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .admin .clip-title::after {
+    content: "  ADMIN";
+    color: #fbbf24;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  @media print {
+    body { background: #fff; color: #000; padding: 12px; }
+    h1 { color: #000; }
+    .subtitle { color: #555; }
+    .legend { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
+    .clip { background: #fff; border-color: #cbd5e1; border-left-color: #64748b; color: #0f172a; box-shadow: none; page-break-inside: avoid; }
+    .clip-title { color: #0f172a; }
+    .show-text { color: #1e40af; }
+    .say-text { color: #78350f; background: #fef3c733; border-left-color: #d97706; }
+    .tag-show { background: #1e40af; color: #fff; }
+    .tag-say  { background: #b45309; color: #fff; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>QC Vendor Portal — Tutorial Script</h1>
+  <div class="subtitle">Glance-friendly script for screen recording. 14 clips · ~7 min total.</div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#1e40af"></span> <b>SHOW</b> — what to have on screen</span>
+    <span><span class="dot" style="background:#b45309"></span> <b>SAY</b> — narration</span>
+    <span><span class="dot" style="background:#fbbf24"></span> ADMIN — admin-only feature</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- 1 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">1. Sign in</div><div class="clip-meta">~30s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">/login</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        To get into the portal, go to qc-vendor-portal.vercel.app. Type your email, hit <b>Send sign-in link</b>, and check your inbox. Click the link in the email and you're in. The link expires in 15 minutes and only works once — if it expires, just request a new one.
+      </div></div>
+    </div>
+
+    <!-- 2 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">2. The big picture</div><div class="clip-meta">~45s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">/queue — point at top nav</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        The nav across the top follows the workflow. <b>Queue</b> is where orders land. <b>Merge</b> handles duplicates. <b>Batches</b> is what's been shipped. <b>Billing</b> and <b>Payments</b> handle the money side. <b>Ledger</b> is your running balance. <b>Out of Stock</b> and <b>Returns</b> are operational tabs you'll touch occasionally. Once a day you'll probably hit Queue and Batches. Everything else only when there's something to do.
+      </div></div>
+    </div>
+
+    <!-- 3 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">3. Pulling orders</div><div class="clip-meta">~45s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Queue → Pull new orders → Google Sheet → Pull</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        Hit <b>Pull new orders</b>. The Google Sheet is already configured, so just click <b>Pull</b>. New orders show up in the queue with red URGENT bars on the left if they're flagged. Duplicate orders sharing an email get a yellow <b>Merge</b> tag. Click <b>Verify against ShipStation</b> up top and the portal confirms each one exists in SS.
+      </div></div>
+    </div>
+
+    <!-- 4 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">4. Per-order notes + stock status</div><div class="clip-meta">~45s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Click an order # — modal opens</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        Click any order number or the pencil icon to open notes. Top section is whole-order notes — handy for things like "bad address". Bottom section is per-item — if a SKU is out of stock or backordered, flag it here. The status carries to every other order that has the same SKU automatically, and to future orders that come in.
+      </div></div>
+    </div>
+
+    <!-- 5 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">5. Merging duplicates</div><div class="clip-meta">~45s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Merge tab → click Merge on a group</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        When two orders share the same email and address, merge them so the customer gets one shipment. Pick the order number you want to keep, click <b>Merge</b>, done. The portal moves all items onto the surviving order. After this, go to ShipStation and finish the merge in their UI too — the portal flags both shipments with a <b>Merge</b> tag to make them easy to find.
+      </div></div>
+    </div>
+
+    <!-- 6 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">6. Fetching shipped labels into a batch</div><div class="clip-meta">~60s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Batches → Fetch Printed Labels → batch detail</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        After you've printed labels in ShipStation, come back here and hit <b>Fetch Printed Labels</b>. Pick the date range — it defaults to since the last fetch. The portal pulls every shipment that has a label, creates a batch, and matches up the items. If something was on the order but not on the label, that item stays in the queue as a partial. Open the batch to see what's in it.
+      </div></div>
+    </div>
+
+    <!-- 7 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">7. Creating an invoice from a batch</div><div class="clip-meta">~45s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Batch detail → review lines → Create Invoice</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        Each line shows the cost of goods and the per-item handling charge. Adjust any prices if needed — changes save back to the SKU catalog. When the totals look right, hit <b>Create Invoice</b>. It lands on the <b>Billing</b> tab and the ledger updates.
+      </div></div>
+    </div>
+
+    <!-- 8 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">8. Reconciling when SS items differ</div><div class="clip-meta">~30s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Queue → click refresh icon on an order</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        If you swapped an item in ShipStation — say, an out-of-stock substitution — click the refresh icon on the queue row. The portal pulls the current ShipStation items and shows a diff: add, remove, qty change. Click <b>Apply</b> and the portal matches what was actually shipped.
+      </div></div>
+    </div>
+
+    <!-- 9 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">9. Payments — send + receive</div><div class="clip-meta">~60s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Billing → Send Payment → fill dialog</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        I send a payment by clicking <b>Send Payment</b>, entering the amount, and allocating it across one or more open invoices. Anything left over rides as account credit. On the vendor side, you'll see it on the <b>Payments</b> tab marked "pending receipt". Click <b>Mark received</b> when the money lands. That's when it counts on the ledger and invoices flip to paid.
+      </div></div>
+    </div>
+
+    <!-- 10 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">10. Manual invoice</div><div class="clip-meta">~30s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Billing → + Manual invoice</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        For one-off charges or carry-over balances, hit <b>Manual invoice</b>. <b>Quick</b> mode is just a description and an amount. <b>Itemized</b> mode lets you build a full line-by-line invoice. Either way it lands on the ledger the same as any other invoice.
+      </div></div>
+    </div>
+
+    <!-- 11 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">11. Out of stock screen</div><div class="clip-meta">~30s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Out of Stock tab</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        Every SKU you've flagged as out-of-stock, backordered, or discontinued shows up here grouped by SKU. When stock's back, hit <b>Mark in-stock</b> and the flag clears across every order using that SKU. The row stays so you can push the update to the storefront — that one-click sync is coming soon.
+      </div></div>
+    </div>
+
+    <!-- 12 -->
+    <div class="clip">
+      <div class="clip-head"><div class="clip-title">12. Returns</div><div class="clip-meta">~30s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Returns tab → Log return → Mark received</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        When a customer returns, log it here with the order number and reason. The return shows as pending until the vendor receives the items — they hit <b>Mark received</b>, enter the credit amount, and that posts a credit against the outstanding balance.
+      </div></div>
+    </div>
+
+    <!-- 13 -->
+    <div class="clip admin">
+      <div class="clip-head"><div class="clip-title">13. Managing users</div><div class="clip-meta">~20s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Settings → Users &amp; access</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        Only emails on this list can sign in. Add anyone who needs access — vendor, helpers, whoever. Remove them to instantly revoke.
+      </div></div>
+    </div>
+
+    <!-- 14 -->
+    <div class="clip admin">
+      <div class="clip-head"><div class="clip-title">14. Billing rules + SKUs</div><div class="clip-meta">~30s</div></div>
+      <div class="row"><div class="tag tag-show">SHOW</div><div class="row-body show-text">Settings → Billing rules, then SKUs</div></div>
+      <div class="row"><div class="tag tag-say">SAY</div><div class="row-body say-text">
+        <b>Billing rules</b> sets the handling charge — by default any item under $40 carries 50 cents. Change it here, applies to future invoices. <b>SKUs</b> is your catalog — costs auto-populate from the Google Sheet on first sight, but you can edit any of them.
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
