@@ -97,11 +97,14 @@ async function computeDiff(orderNumber: string): Promise<ReconcileDiff | { error
     for (const it of sh.items ?? []) ssItems.push(it)
   }
 
-  // Portal items in reconcilable state (skip batched/shipped — locked)
+  // Pull ALL live portal items for the order — we need shipped items in the
+  // match pool so they're recognized as already-on-SS (otherwise reconcile
+  // would re-add every previously-shipped item as "missing" on a partial order).
+  // Only queued items are eligible for "remove" (you can't un-ship).
   const portalItems = await db
     .select()
     .from(schema.orderItems)
-    .where(sql`${schema.orderItems.orderNumber} = ${orderNumber} AND ${schema.orderItems.status} IN ('queued','partial')`)
+    .where(sql`${schema.orderItems.orderNumber} = ${orderNumber} AND ${schema.orderItems.status} IN ('queued','shipped','batched')`)
 
   // Match each SS item to a portal item; track which portal items got hit
   const portalMatched = new Set<string>()
@@ -135,13 +138,17 @@ async function computeDiff(orderNumber: string): Promise<ReconcileDiff | { error
     }
     portalMatched.add(pi.id)
     const ssQty = si.quantity ?? pi.qty
-    if (ssQty !== pi.qty) {
+    // Only suggest qty changes on queued items. Shipped items are locked-in
+    // and we shouldn't try to "correct" their qty after the fact.
+    if (ssQty !== pi.qty && pi.status === 'queued') {
       qtyChanged.push({ id: pi.id, sku: pi.sku, name: pi.name, portalQty: pi.qty, ssQty })
     }
   }
 
+  // Only queued portal items are eligible for "cancel in portal" — shipped
+  // items can't be un-shipped via reconcile.
   const removed = portalItems
-    .filter(p => !portalMatched.has(p.id))
+    .filter(p => p.status === 'queued' && !portalMatched.has(p.id))
     .map(p => ({ id: p.id, sku: p.sku, name: p.name, qty: p.qty }))
 
   return {
