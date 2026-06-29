@@ -4,6 +4,7 @@ import { db, schema } from '@/db/client'
 import { fromCents } from '@/lib/money'
 import { getSession } from '@/lib/auth'
 import { BatchLineEditor, type BatchLine } from './line-editor'
+import { getBillingRule } from '@/lib/billing-rules-db'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,8 +57,18 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
       qty: it.qty,
       baseCost,
       skuInDb: !!sku,
+      mergedFromOrderNumber: it.mergedFromOrderNumber,
     }
   })
+
+  // Which order numbers in this batch absorbed merges? Used to badge the order header.
+  const mergedFromByOrder = new Map<string, string[]>()
+  for (const it of items) {
+    if (!it.mergedFromOrderNumber) continue
+    const list = mergedFromByOrder.get(it.orderNumber) || []
+    if (!list.includes(it.mergedFromOrderNumber)) list.push(it.mergedFromOrderNumber)
+    mergedFromByOrder.set(it.orderNumber, list)
+  }
 
   return (
     <div className="space-y-3">
@@ -92,6 +103,8 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
         invoiceId={invoice?.id ?? null}
         invoiceTotalCents={invoice?.totalCents ?? null}
         isAdmin={isAdmin}
+        mergedFromByOrder={Object.fromEntries(mergedFromByOrder)}
+        billingRule={getBillingRule()}
       />
     </div>
   )

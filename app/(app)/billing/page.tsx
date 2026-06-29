@@ -5,6 +5,7 @@ import { fromCents } from '@/lib/money'
 import { getLedger, invoiceOpenBalance } from '@/lib/ledger'
 import { getSession } from '@/lib/auth'
 import { RecordPaymentButton } from './record-payment'
+import { NewInvoiceButton } from './new-invoice-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,10 @@ export default async function BillingPage() {
             )}
           </p>
         </div>
-        <RecordPaymentButton invoices={openInvoiceOptions} isAdmin={isAdmin} />
+        <div className="flex gap-2">
+          <NewInvoiceButton isAdmin={isAdmin} />
+          <RecordPaymentButton invoices={openInvoiceOptions} isAdmin={isAdmin} />
+        </div>
       </div>
 
       {/* Summary tiles */}
@@ -70,7 +74,11 @@ export default async function BillingPage() {
                   <Link href={`/invoices/${inv.id}`} className="text-slate-900 hover:text-emerald-700 hover:underline">{inv.id}</Link>
                 </td>
                 <td className="px-3 py-1.5 text-slate-600 font-mono">
-                  <Link href={`/batches/${inv.batchId}`} className="hover:text-emerald-700 hover:underline">{inv.batchId}</Link>
+                  {inv.batchId ? (
+                    <Link href={`/batches/${inv.batchId}`} className="hover:text-emerald-700 hover:underline">{inv.batchId}</Link>
+                  ) : (
+                    <span className="text-[11px] uppercase tracking-wide bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-sans font-semibold">Manual</span>
+                  )}
                 </td>
                 <td className="px-3 py-1.5 text-slate-600 tabular-nums">{new Date(inv.createdAt).toLocaleDateString()}</td>
                 <td className="px-3 py-1.5">{statusPill(inv.status)}</td>

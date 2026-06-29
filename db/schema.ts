@@ -18,6 +18,13 @@ export const skus = sqliteTable('skus', {
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  // v2.2 — SKU-level stock status (single source of truth, propagates to all queued items)
+  statusFlag: text('sku_status_flag', {
+    enum: ['out_of_stock', 'backordered', 'discontinued', 'other'],
+  }),
+  statusPendingUntil: integer('sku_status_pending_until', { mode: 'timestamp' }),
+  statusNotes: text('sku_status_notes').notNull().default(''),
+  statusSetAt: integer('sku_status_set_at', { mode: 'timestamp' }),
 })
 
 export const orders = sqliteTable('orders', {
@@ -68,6 +75,8 @@ export const orderItems = sqliteTable('order_items', {
   }),
   pendingUntil: integer('pending_until', { mode: 'timestamp' }),
   notes: text('notes').notNull().default(''),
+  // v2.2 — merge provenance (set when item was moved from an absorbed order)
+  mergedFromOrderNumber: text('merged_from_order_number'),
 })
 
 export const batches = sqliteTable('batches', {
@@ -85,10 +94,13 @@ export const batches = sqliteTable('batches', {
 
 export const invoices = sqliteTable('invoices', {
   id: text('id').primaryKey(),
-  batchId: text('batch_id').notNull().references(() => batches.id),
+  // Nullable so manual (non-batch) invoices are possible.
+  batchId: text('batch_id').references(() => batches.id),
   totalCents: integer('total_cents').notNull().default(0),
   status: text('status', { enum: ['open', 'partial', 'paid'] }).notNull().default('open'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  // v2.2 — manual invoices carry a description; batch invoices leave this blank.
+  description: text('description').notNull().default(''),
 })
 
 export const invoiceLines = sqliteTable('invoice_lines', {
@@ -153,8 +165,33 @@ export const ssSyncCursor = sqliteTable('ss_sync_cursor', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 })
 
+// v2.2 — admin-tweakable billing rule values (singleton row id=1)
+export const billingSettings = sqliteTable('billing_settings', {
+  id: integer('id').primaryKey(),
+  handlingThresholdCents: integer('handling_threshold_cents').notNull().default(4000),
+  handlingPerItemCents: integer('handling_per_item_cents').notNull().default(50),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedBy: text('updated_by').references(() => users.id),
+})
+
+// v2.2 — Returns
+export const returns = sqliteTable('returns', {
+  id: text('id').primaryKey(),
+  orderNumber: text('order_number').notNull(),
+  reason: text('reason').notNull().default(''),
+  status: text('status', { enum: ['logged', 'received', 'cancelled'] }).notNull().default('logged'),
+  loggedAt: integer('logged_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  loggedBy: text('logged_by').notNull().references(() => users.id),
+  receivedAt: integer('received_at', { mode: 'timestamp' }),
+  receivedBy: text('received_by').references(() => users.id),
+  creditCents: integer('credit_cents').notNull().default(0),
+  notes: text('notes').notNull().default(''),
+})
+
 export type User = typeof users.$inferSelect
 export type Sku = typeof skus.$inferSelect
+export type BillingSettings = typeof billingSettings.$inferSelect
+export type Return = typeof returns.$inferSelect
 export type Order = typeof orders.$inferSelect
 export type OrderItem = typeof orderItems.$inferSelect
 export type Batch = typeof batches.$inferSelect

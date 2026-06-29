@@ -72,6 +72,7 @@ export default async function QueuePage() {
         statusFlag: i.statusFlag,
         pendingUntil: isoDate(i.pendingUntil as Date | null),
         itemNotes: i.notes,
+        mergedFromOrderNumber: i.mergedFromOrderNumber,
       })),
   }))
 

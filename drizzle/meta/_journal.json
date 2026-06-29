@@ -15,6 +15,20 @@
       "when": 1782659138378,
       "tag": "0001_funny_puma",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782718138835,
+      "tag": "0002_even_blazing_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782718758488,
+      "tag": "0003_fearless_silver_fox",
+      "breakpoints": true
     }
   ]
 }

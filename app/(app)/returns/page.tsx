@@ -1,80 +1,90 @@
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { desc, eq } from 'drizzle-orm'
+import { db, schema } from '@/db/client'
+import { fromCents } from '@/lib/money'
+import { LogReturnButton } from './log-return-button'
+import { MarkReceivedButton } from './mark-received-button'
 
 export const dynamic = 'force-dynamic'
 
-export default function ReturnsPage() {
+export default async function ReturnsPage() {
+  const logged = db.select().from(schema.returns).where(eq(schema.returns.status, 'logged')).orderBy(desc(schema.returns.loggedAt)).all()
+  const received = db.select().from(schema.returns).where(eq(schema.returns.status, 'received')).orderBy(desc(schema.returns.receivedAt)).all()
+  const creditSum = received.reduce((a, r) => a + r.creditCents, 0)
+
   return (
     <div className="space-y-3">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Returns</h1>
-        <p className="text-[13px] text-slate-600 mt-0.5">
-          Log an order that&apos;s being returned. When vendor acks receipt of the items, the COG credits back to your outstanding balance.
-        </p>
-      </div>
-
-      <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-[12px] text-amber-900">
-        <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-800 mr-2">Placeholder</span>
-        Flow not wired yet: (1) admin enters an order # being returned, (2) vendor sees it in the &quot;Awaiting receipt&quot; list, (3) vendor acks receipt → the line-item COG totals (from the original invoice) post as a credit on the ledger.
-      </div>
-
-      <section className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
-        <header className="px-3 py-1.5 bg-slate-100 border-b border-slate-300 text-[11px] uppercase tracking-wider font-semibold text-slate-700">
-          Log a return
-        </header>
-        <div className="p-4 space-y-3 max-w-md">
-          <div>
-            <Label htmlFor="ret-order">Order number being returned</Label>
-            <Input id="ret-order" placeholder="e.g. 212629" disabled />
-          </div>
-          <div>
-            <Label htmlFor="ret-reason">Reason (optional)</Label>
-            <Input id="ret-reason" placeholder="e.g. wrong size, damaged in transit" disabled />
-          </div>
-          <Button disabled className="bg-slate-400 cursor-not-allowed" title="Not implemented — placeholder for v1">
-            Log return (coming soon)
-          </Button>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Returns</h1>
+          <p className="text-[13px] text-slate-600 mt-0.5">
+            {logged.length} awaiting vendor receipt · {received.length} received{creditSum > 0 && <> · <span className="text-emerald-700 font-medium">{fromCents(creditSum)} credited</span></>}
+          </p>
         </div>
-      </section>
+        <LogReturnButton />
+      </div>
 
-      <section className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
-        <header className="px-3 py-1.5 bg-slate-100 border-b border-slate-300 text-[11px] uppercase tracking-wider font-semibold text-slate-700 flex items-center justify-between">
-          <span>Awaiting vendor receipt</span>
-          <span className="text-slate-500">0</span>
+      <section className="bg-white border border-amber-300 rounded-md shadow-sm overflow-hidden">
+        <header className="px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-[11px] uppercase tracking-wider font-semibold text-amber-900 flex items-center justify-between">
+          <span>Awaiting vendor receipt</span><span>{logged.length}</span>
         </header>
         <table className="w-full text-[13px] border-collapse">
           <thead>
             <tr className="bg-slate-800 text-slate-100 text-[11px] uppercase tracking-wider">
-              <th className="px-3 py-2 text-left font-semibold w-32">Logged</th>
+              <th className="px-3 py-2 text-left font-semibold w-28">Logged</th>
               <th className="px-3 py-2 text-left font-semibold w-28">Order</th>
-              <th className="px-3 py-2 text-left font-semibold">Reason</th>
-              <th className="px-3 py-2 text-right font-semibold w-28">COG to credit</th>
-              <th className="px-3 py-2 text-right font-semibold w-32"></th>
+              <th className="px-3 py-2 text-left font-semibold">Reason / Notes</th>
+              <th className="px-3 py-2 text-right font-semibold w-36"></th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-500">No pending returns.</td></tr>
+            {logged.length === 0 && (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No returns awaiting receipt.</td></tr>
+            )}
+            {logged.map(r => (
+              <tr key={r.id} className="border-t border-slate-200 align-top">
+                <td className="px-3 py-1.5 text-slate-600 tabular-nums">{r.loggedAt.toLocaleDateString()}</td>
+                <td className="px-3 py-1.5 font-mono font-semibold">#{r.orderNumber}</td>
+                <td className="px-3 py-1.5">
+                  <div className="font-medium text-slate-800">{r.reason || <span className="text-slate-400">—</span>}</div>
+                  {r.notes && <div className="text-[12px] text-slate-600 italic">“{r.notes}”</div>}
+                </td>
+                <td className="px-3 py-1.5 text-right">
+                  <MarkReceivedButton returnId={r.id} orderNumber={r.orderNumber} />
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </section>
 
       <section className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
         <header className="px-3 py-1.5 bg-slate-100 border-b border-slate-300 text-[11px] uppercase tracking-wider font-semibold text-slate-700 flex items-center justify-between">
-          <span>Received</span>
-          <span className="text-slate-500">0</span>
+          <span>Received & credited</span><span className="text-slate-500">{received.length}</span>
         </header>
         <table className="w-full text-[13px] border-collapse">
           <thead>
             <tr className="bg-slate-800 text-slate-100 text-[11px] uppercase tracking-wider">
-              <th className="px-3 py-2 text-left font-semibold w-32">Received</th>
+              <th className="px-3 py-2 text-left font-semibold w-28">Received</th>
               <th className="px-3 py-2 text-left font-semibold w-28">Order</th>
-              <th className="px-3 py-2 text-left font-semibold">Reason</th>
-              <th className="px-3 py-2 text-right font-semibold w-28">Credited</th>
+              <th className="px-3 py-2 text-left font-semibold">Reason / Notes</th>
+              <th className="px-3 py-2 text-right font-semibold w-28">Credit</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colSpan={4} className="px-4 py-12 text-center text-slate-500">No returns received yet.</td></tr>
+            {received.length === 0 && (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No received returns yet.</td></tr>
+            )}
+            {received.map(r => (
+              <tr key={r.id} className="border-t border-slate-200">
+                <td className="px-3 py-1.5 text-slate-600 tabular-nums">{r.receivedAt?.toLocaleDateString() ?? '—'}</td>
+                <td className="px-3 py-1.5 font-mono font-semibold">#{r.orderNumber}</td>
+                <td className="px-3 py-1.5">
+                  <div className="font-medium text-slate-800">{r.reason || <span className="text-slate-400">—</span>}</div>
+                  {r.notes && <div className="text-[12px] text-slate-600 italic">“{r.notes}”</div>}
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-emerald-700 font-semibold">{fromCents(r.creditCents)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </section>

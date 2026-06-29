@@ -15,11 +15,19 @@ export type MergeCandidate = {
   addressMatches: boolean
 }
 
+type MergeResult = {
+  keepOrderNumber: string
+  merged: number
+  mergeOrderNumbers: string[]
+}
+
 export function MergeGroupButton({ email, candidates }: { email: string; candidates: MergeCandidate[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [keep, setKeep] = useState(candidates[0]?.orderNumber || '')
   const [busy, setBusy] = useState(false)
+  const [resultOpen, setResultOpen] = useState(false)
+  const [result, setResult] = useState<MergeResult | null>(null)
 
   const allMatch = candidates.every(c => c.addressMatches)
 
@@ -43,15 +51,18 @@ export function MergeGroupButton({ email, candidates }: { email: string; candida
       return
     }
     const d = await r.json()
-    if (d.anyFallback) {
-      toast.warning(
-        `Merged ${d.merged} into #${d.keepOrderNumber} — SS merge API unavailable, wrote notes + Merge tag on shipments (finish in SS UI).`,
-        { duration: 8000 },
-      )
-    } else {
-      toast.success(`Merged ${d.merged} into #${d.keepOrderNumber} via ShipStation`)
-    }
     setOpen(false)
+    setResult({
+      keepOrderNumber: d.keepOrderNumber,
+      merged: d.merged,
+      mergeOrderNumbers: mergeList,
+    })
+    setResultOpen(true)
+  }
+
+  function closeResult() {
+    setResultOpen(false)
+    setResult(null)
     router.refresh()
   }
 
@@ -115,6 +126,36 @@ export function MergeGroupButton({ email, candidates }: { email: string; candida
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Result modal — replaces the toast */}
+      <Dialog open={resultOpen} onOpenChange={v => { if (!v) closeResult() }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Merge complete ✓</DialogTitle>
+            <DialogDescription>
+              The portal has combined the orders and moved every line item onto the survivor.
+            </DialogDescription>
+          </DialogHeader>
+          {result && (
+            <div className="space-y-3 text-[13px]">
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Surviving order</div>
+                <div className="font-mono text-slate-900 text-[15px] font-semibold">#{result.keepOrderNumber}</div>
+                <div className="text-[12px] text-slate-600 mt-1">
+                  {result.merged} order{result.merged === 1 ? '' : 's'} merged into this one — items show <em>“from #X”</em> beside them.
+                </div>
+              </div>
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+                <div className="text-[11px] uppercase tracking-wider font-semibold mb-1">Don&apos;t forget</div>
+                Open ShipStation and finalize the merge in the SS UI — the portal flagged both shipments with a <span className="font-mono">Merge</span> tag + note so they&apos;re easy to find.
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={closeResult} className="bg-emerald-600 hover:bg-emerald-700">Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

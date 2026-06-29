@@ -77,9 +77,9 @@ export async function POST(req: Request) {
     }
 
     // Move all order_items from the absorbed order onto the survivor.
-    // This is what makes the survivor's batch billing pick up the merged items.
+    // Stamp mergedFromOrderNumber so the UI can show "— from #merge" provenance.
     const movedItems = db.update(schema.orderItems)
-      .set({ orderNumber: keep })
+      .set({ orderNumber: keep, mergedFromOrderNumber: merge })
       .where(eq(schema.orderItems.orderNumber, merge))
       .run()
 

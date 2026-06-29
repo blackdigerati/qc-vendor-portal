@@ -10,7 +10,7 @@ type Allocation = { invoiceId: string; amountCents: number }
 
 type Row =
   | { kind: 'opening'; date: Date; debitCents: number; creditCents: number }
-  | { kind: 'invoice'; date: Date; debitCents: number; creditCents: number; invoiceId: string; batchId: string }
+  | { kind: 'invoice'; date: Date; debitCents: number; creditCents: number; invoiceId: string; batchId: string | null; description: string }
   | { kind: 'payment'; date: Date; debitCents: number; creditCents: number; paymentId: string; refNote: string; allocations: Allocation[]; creditRemainCents: number }
 
 export default async function LedgerPage() {
@@ -34,7 +34,7 @@ export default async function LedgerPage() {
   const rows: Row[] = []
   if (ob) rows.push({ kind: 'opening', date: ob.asOf, debitCents: ob.amountCents, creditCents: 0 })
   for (const inv of invoices) {
-    rows.push({ kind: 'invoice', date: inv.createdAt, debitCents: inv.totalCents, creditCents: 0, invoiceId: inv.id, batchId: inv.batchId })
+    rows.push({ kind: 'invoice', date: inv.createdAt, debitCents: inv.totalCents, creditCents: 0, invoiceId: inv.id, batchId: inv.batchId, description: inv.description })
   }
   for (const p of payments) {
     const myAllocs = allocsByPayment.get(p.id) || []
@@ -97,9 +97,12 @@ export default async function LedgerPage() {
                         {r.invoiceId}
                       </Link>{' '}
                       <span className="text-slate-500">
-                        (batch{' '}
-                        <Link href={`/batches/${r.batchId}`} className="font-mono hover:text-emerald-700 hover:underline">{r.batchId}</Link>
-                        )
+                        {r.batchId ? (
+                          <>(batch <Link href={`/batches/${r.batchId}`} className="font-mono hover:text-emerald-700 hover:underline">{r.batchId}</Link>)</>
+                        ) : (
+                          <span className="inline-flex items-center px-1 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-slate-200 text-slate-700">Manual</span>
+                        )}
+                        {r.description && <span className="ml-1 italic text-slate-500"> — {r.description}</span>}
                       </span>
                     </span>
                   )}

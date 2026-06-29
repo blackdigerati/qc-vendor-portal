@@ -20,6 +20,7 @@ export type QueueItem = {
   statusFlag: 'out_of_stock' | 'backordered' | 'discontinued' | 'other' | null
   pendingUntil: string | null
   itemNotes: string
+  mergedFromOrderNumber: string | null
 }
 export type QueueOrder = {
   orderNumber: string
@@ -187,11 +188,6 @@ export function QueueTable({
                     >
                       <Pencil className="size-3.5" />
                     </button>
-                    {o.urgent && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-red-600 text-white">
-                        Urgent
-                      </span>
-                    )}
                     {o.needsMerge && o.mergedFrom.length === 0 && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300">
                         Merge?
@@ -238,6 +234,11 @@ export function QueueTable({
                     {i.itemNotes && (
                       <span className="ml-2 text-[11px] text-slate-500 italic align-middle" title={i.itemNotes}>
                         “{i.itemNotes.length > 60 ? i.itemNotes.slice(0, 57) + '…' : i.itemNotes}”
+                      </span>
+                    )}
+                    {i.mergedFromOrderNumber && (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide bg-slate-900 text-white align-middle">
+                        from #{i.mergedFromOrderNumber}
                       </span>
                     )}
                   </td>

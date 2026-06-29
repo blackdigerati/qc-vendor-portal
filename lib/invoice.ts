@@ -5,6 +5,7 @@ import { writeAudit } from './audit'
 import { sendAlert } from './mailer'
 import { fromCents } from './money'
 import { computeHandlingPerItem } from './billing-rules'
+import { getBillingRule } from './billing-rules-db'
 
 function nextInvoiceId(): string {
   const year = new Date().getFullYear()
@@ -40,6 +41,8 @@ export async function createInvoiceForBatch(batchId: string, actor?: string): Pr
   const items = db.select().from(schema.orderItems).where(eq(schema.orderItems.batchId, batchId)).all()
   if (items.length === 0) return { error: 'No items in batch' }
 
+  const rule = getBillingRule()
+
   const skuRows = db
     .select()
     .from(schema.skus)
@@ -70,7 +73,7 @@ export async function createInvoiceForBatch(batchId: string, actor?: string): Pr
     }
     // Handling/shipping is rule-based at invoice time (not stored on SKU):
     // any line whose unit cost is below the threshold carries a per-item handling fee.
-    const handlingPerItem = computeHandlingPerItem(unitCost)
+    const handlingPerItem = computeHandlingPerItem(unitCost, rule)
     const lineTotal = (unitCost + handlingPerItem) * it.qty
     if (sku && it.costOfGoodsCents > 0 && unitCost !== it.costOfGoodsCents) {
       warnings.push(

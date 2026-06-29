@@ -40,10 +40,17 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <div className="text-[13px] text-slate-600 mt-0.5 flex items-center gap-2">
             <span>Created {new Date(invoice.createdAt).toLocaleString()}</span>
             <span className="text-slate-400">·</span>
-            <Link href={`/batches/${invoice.batchId}`} className="font-mono text-slate-700 hover:text-emerald-700 hover:underline">{invoice.batchId}</Link>
+            {invoice.batchId ? (
+              <Link href={`/batches/${invoice.batchId}`} className="font-mono text-slate-700 hover:text-emerald-700 hover:underline">{invoice.batchId}</Link>
+            ) : (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-slate-200 text-slate-700">Manual</span>
+            )}
             <span className="text-slate-400">·</span>
             {statusPill(invoice.status)}
           </div>
+          {invoice.description && (
+            <p className="text-[13px] text-slate-700 mt-1 italic">“{invoice.description}”</p>
+          )}
         </div>
         <div className="text-right">
           <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Total</div>

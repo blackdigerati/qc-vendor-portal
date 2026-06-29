@@ -6,11 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { fromCents } from '@/lib/money'
-import {
-  computeHandlingPerItem,
-  HANDLING_PER_ITEM_CENTS,
-  SHIPPING_THRESHOLD_CENTS,
-} from '@/lib/billing-rules'
+import { computeHandlingPerItem, type BillingRule } from '@/lib/billing-rules'
 
 export type BatchLine = {
   orderItemId: string
@@ -21,6 +17,7 @@ export type BatchLine = {
   qty: number
   baseCost: string      // dollars, two decimals (editable)
   skuInDb: boolean
+  mergedFromOrderNumber: string | null
 }
 
 export function BatchLineEditor({
@@ -29,12 +26,16 @@ export function BatchLineEditor({
   invoiceId,
   invoiceTotalCents,
   isAdmin,
+  mergedFromByOrder,
+  billingRule,
 }: {
   batchId: string
   initialLines: BatchLine[]
   invoiceId: string | null
   invoiceTotalCents: number | null
   isAdmin: boolean
+  mergedFromByOrder: Record<string, string[]>
+  billingRule: BillingRule
 }) {
   const router = useRouter()
   const [lines, setLines] = useState<BatchLine[]>(initialLines)
@@ -69,7 +70,7 @@ export function BatchLineEditor({
 
   function lineNumbers(l: BatchLine) {
     const cogCents = Math.round((parseFloat(l.baseCost) || 0) * 100)
-    const handlingPerItemCents = computeHandlingPerItem(cogCents)
+    const handlingPerItemCents = computeHandlingPerItem(cogCents, billingRule)
     const totalCents = (cogCents + handlingPerItemCents) * l.qty
     return { cogCents, handlingPerItemCents, totalCents }
   }
@@ -139,12 +140,6 @@ export function BatchLineEditor({
 
   return (
     <div className="space-y-3">
-      <div className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-[12px] text-slate-700">
-        <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-500 mr-2">Billing rule</span>
-        Lines with COG below <span className="font-medium tabular-nums">{fromCents(SHIPPING_THRESHOLD_CENTS)}</span> carry a{' '}
-        <span className="font-medium tabular-nums">{fromCents(HANDLING_PER_ITEM_CENTS)}</span> per-item handling charge — added at invoice time.
-      </div>
-
       <div className="bg-white border border-slate-300 rounded-md shadow-sm overflow-hidden">
         <table className="w-full text-[13px] border-collapse">
           <thead>
@@ -162,6 +157,7 @@ export function BatchLineEditor({
             {grouped.map(([orderNumber, orderLines]) => {
               const orderTotal = orderLines.reduce((acc, l) => acc + lineNumbers(l).totalCents, 0)
               const urgent = orderLines[0]?.urgent
+              const absorbed = mergedFromByOrder[orderNumber] || []
               return (
                 <Fragment key={orderNumber}>
                   <tr className={`border-t-2 border-slate-400 bg-slate-200 ${urgent ? 'border-l-4 border-l-red-600' : ''}`}>
@@ -170,6 +166,11 @@ export function BatchLineEditor({
                       {urgent && (
                         <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-red-600 text-white">
                           URG
+                        </span>
+                      )}
+                      {absorbed.length > 0 && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide bg-slate-900 text-white">
+                          Merged with {absorbed.map(n => '#' + n).join(', ')}
                         </span>
                       )}
                     </td>
@@ -187,6 +188,11 @@ export function BatchLineEditor({
                           {!l.skuInDb && l.sku && (
                             <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-300 align-middle">
                               NEW SKU
+                            </span>
+                          )}
+                          {l.mergedFromOrderNumber && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide bg-slate-900 text-white align-middle">
+                              from #{l.mergedFromOrderNumber}
                             </span>
                           )}
                         </td>

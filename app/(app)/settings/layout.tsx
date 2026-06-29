@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth'
 
 const items = [
   { href: '/settings/skus', label: 'SKUs & pricing' },
+  { href: '/settings/billing-rules', label: 'Billing rules' },
   { href: '/settings/alerts', label: 'Alert recipients' },
   { href: '/settings/opening-balance', label: 'Opening balance' },
 ]
