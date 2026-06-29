@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -169,6 +169,17 @@ export function BatchLineEditor({
   const [savingSku, setSavingSku] = useState<string | null>(null)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // After router.refresh() the server sends new initialLines via props; keep
+  // local state in sync so edits-from-elsewhere (the EditLineMenu, reconciles,
+  // anything else) show up without a manual reload. We diff by composite key to
+  // avoid clobbering an in-progress COG edit.
+  useEffect(() => {
+    const sig = initialLines.map(l => `${l.orderItemId}:${l.qty}:${l.mergedFromOrderNumber ?? ''}`).join('|')
+    const localSig = lines.map(l => `${l.orderItemId}:${l.qty}:${l.mergedFromOrderNumber ?? ''}`).join('|')
+    if (sig !== localSig) setLines(initialLines)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLines])
 
   async function deleteInvoice() {
     if (!invoiceId) return
