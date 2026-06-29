@@ -14,14 +14,18 @@ if (!SECRET || SECRET.length < 32) {
   console.warn('[auth] SESSION_SECRET missing or <32 chars; cookies will not be secure')
 }
 
+const SESSION_TTL_SECONDS = 15 * 24 * 60 * 60 // 15 days
+
 export const sessionOptions: SessionOptions = {
   password: SECRET || 'dev-only-insecure-placeholder-secret-32xxxxxx',
   cookieName: 'qcvp_session',
+  ttl: SESSION_TTL_SECONDS,
   cookieOptions: {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
+    maxAge: SESSION_TTL_SECONDS,
   },
 }
 
