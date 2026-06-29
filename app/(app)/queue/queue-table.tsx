@@ -34,6 +34,7 @@ export type QueueOrder = {
   needsMerge: boolean
   mergedFrom: string[]
   ssVerifyStatus: 'unverified' | 'verified' | 'email_matched' | 'not_found' | 'error'
+  partialShippedCount: number // count of items on this order already shipped in a prior batch
   items: QueueItem[]
 }
 
@@ -195,6 +196,14 @@ export function QueueTable({
                     {o.needsMerge && o.mergedFrom.length === 0 && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300">
                         Merge?
+                      </span>
+                    )}
+                    {o.partialShippedCount > 0 && (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white"
+                        title={`${o.partialShippedCount} item${o.partialShippedCount === 1 ? '' : 's'} on this order already shipped in a prior batch`}
+                      >
+                        Partial · {o.partialShippedCount} shipped
                       </span>
                     )}
                     {o.mergedFrom.length > 0 && (

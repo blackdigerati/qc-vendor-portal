@@ -18,13 +18,17 @@ export default async function QueuePage() {
     .orderBy(desc(schema.orders.urgent), desc(schema.orders.pulledAt))
 
   const orderNums = orders.map(o => o.orderNumber)
-  const items = orderNums.length
-    ? (await db
-        .select()
-        .from(schema.orderItems)
-        .where(inArray(schema.orderItems.orderNumber, orderNums)))
-        .filter(i => i.status === 'queued')
+  const allItemsForOrders = orderNums.length
+    ? await db.select().from(schema.orderItems).where(inArray(schema.orderItems.orderNumber, orderNums))
     : []
+  const items = allItemsForOrders.filter(i => i.status === 'queued')
+  // Count of items per order that have already shipped in a prior batch — used
+  // to flag the order row as "PARTIAL · N shipped" in the queue.
+  const shippedCountByOrder = new Map<string, number>()
+  for (const it of allItemsForOrders) {
+    if (it.status !== 'shipped') continue
+    shippedCountByOrder.set(it.orderNumber, (shippedCountByOrder.get(it.orderNumber) || 0) + 1)
+  }
 
   const skuRows = await db.select({ sku: schema.skus.sku }).from(schema.skus)
   const knownSkus = new Set(skuRows.map(r => r.sku))
@@ -57,6 +61,7 @@ export default async function QueuePage() {
     needsMerge: mergeEmails.has(o.email),
     mergedFrom: mergedFrom.get(o.orderNumber) || [],
     ssVerifyStatus: o.ssVerifyStatus,
+    partialShippedCount: shippedCountByOrder.get(o.orderNumber) || 0,
     items: items
       .filter(i => i.orderNumber === o.orderNumber)
       .map(i => ({

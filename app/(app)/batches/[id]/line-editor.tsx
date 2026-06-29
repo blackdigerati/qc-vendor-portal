@@ -214,6 +214,7 @@ export function BatchLineEditor({
   invoiceTotalCents,
   isAdmin,
   mergedFromByOrder,
+  partialPendingByOrder,
   billingRule,
 }: {
   batchId: string
@@ -222,6 +223,7 @@ export function BatchLineEditor({
   invoiceTotalCents: number | null
   isAdmin: boolean
   mergedFromByOrder: Record<string, string[]>
+  partialPendingByOrder: Record<string, number>
   billingRule: BillingRule
 }) {
   const router = useRouter()
@@ -369,6 +371,14 @@ export function BatchLineEditor({
                       {absorbed.length > 0 && (
                         <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide bg-slate-900 text-white">
                           Merged with {absorbed.map(n => '#' + n).join(', ')}
+                        </span>
+                      )}
+                      {(partialPendingByOrder[orderNumber] || 0) > 0 && (
+                        <span
+                          className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white"
+                          title={`${partialPendingByOrder[orderNumber]} item(s) on this order still in the queue`}
+                        >
+                          Partial · {partialPendingByOrder[orderNumber]} still queued
                         </span>
                       )}
                     </td>

@@ -70,6 +70,22 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
     mergedFromByOrder.set(it.orderNumber, list)
   }
 
+  // For each order in this batch, count items still queued elsewhere (i.e. NOT in
+  // this batch and NOT already shipped/cancelled) — these were bounced back to
+  // the queue or were on the order but not in this label. Used to badge the
+  // order header "Partial · N still in queue".
+  const partialPendingByOrder = new Map<string, number>()
+  if (orderNums.length) {
+    const allItemsForOrders = await db
+      .select()
+      .from(schema.orderItems)
+      .where(inArray(schema.orderItems.orderNumber, orderNums))
+    for (const it of allItemsForOrders) {
+      if (it.status !== 'queued') continue
+      partialPendingByOrder.set(it.orderNumber, (partialPendingByOrder.get(it.orderNumber) || 0) + 1)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between">
@@ -104,6 +120,7 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
         invoiceTotalCents={invoice?.totalCents ?? null}
         isAdmin={isAdmin}
         mergedFromByOrder={Object.fromEntries(mergedFromByOrder)}
+        partialPendingByOrder={Object.fromEntries(partialPendingByOrder)}
         billingRule={await getBillingRule()}
       />
     </div>
