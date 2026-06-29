@@ -76,12 +76,24 @@ export async function POST(req: Request) {
       detail = `${detail}; wrote notes + tag on both shipments — vendor to finish in SS UI`
     }
 
+    // Move all order_items from the absorbed order onto the survivor.
+    // This is what makes the survivor's batch billing pick up the merged items.
+    const movedItems = db.update(schema.orderItems)
+      .set({ orderNumber: keep })
+      .where(eq(schema.orderItems.orderNumber, merge))
+      .run()
+
     db.update(schema.orders).set({
       mergedIntoOrderNumber: keep,
       status: 'cancelled',
     }).where(eq(schema.orders.orderNumber, merge)).run()
 
-    results.push({ orderNumber: merge, ok: true, fallbackUsed, detail })
+    results.push({
+      orderNumber: merge,
+      ok: true,
+      fallbackUsed,
+      detail: `${detail}; moved ${movedItems.changes} item(s) to survivor`,
+    })
   }
 
   await writeAudit({
