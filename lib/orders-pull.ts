@@ -60,7 +60,13 @@ export async function pullOrders(
       state: head.state,
       zip: head.zip,
       country: head.country,
-      notes: items.map(i => i.notes).filter(Boolean).join(' | '),
+      notes: [
+        ...new Set(
+          items
+            .map(i => (i.notes || '').replace(/\burgent\b/gi, '').replace(/\|/g, ' ').replace(/\s+/g, ' ').trim())
+            .filter(Boolean),
+        ),
+      ].join(' | '),
       urgent,
       source: opts.source,
       status: 'queued',

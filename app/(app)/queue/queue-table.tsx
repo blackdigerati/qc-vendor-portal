@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { PullOrdersDialog } from './pull-dialog'
 import { NotesCell } from './notes-cell'
 import { ItemStatusPill, OrderNotesModal, type OrderModalData } from './order-notes-modal'
+import { ReconcileButton } from './reconcile-button'
 
 export type QueueItem = {
   id: string
@@ -188,6 +189,9 @@ export function QueueTable({
                     >
                       <Pencil className="size-3.5" />
                     </button>
+                    {(o.ssVerifyStatus === 'verified' || o.ssVerifyStatus === 'email_matched') && (
+                      <ReconcileButton orderNumber={o.orderNumber} />
+                    )}
                     {o.needsMerge && o.mergedFrom.length === 0 && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300">
                         Merge?
