@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 import { fromCents } from '@/lib/money'
 import { computeHandlingPerItem, type BillingRule } from '@/lib/billing-rules'
 
@@ -18,6 +23,128 @@ export type BatchLine = {
   baseCost: string      // dollars, two decimals (editable)
   skuInDb: boolean
   mergedFromOrderNumber: string | null
+}
+
+function EditLineMenu({ batchId, line }: { batchId: string; line: BatchLine }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<'reduce' | 'remove'>(line.qty > 1 ? 'reduce' : 'remove')
+  const [newQty, setNewQty] = useState(String(Math.max(1, line.qty - 1)))
+  const [reason, setReason] = useState('')
+  const [bounceBack, setBounceBack] = useState(true)
+  const [busy, setBusy] = useState(false)
+
+  async function submit() {
+    setBusy(true)
+    let body: Record<string, unknown>
+    if (mode === 'reduce') {
+      const n = parseInt(newQty, 10)
+      if (!n || n < 1 || n >= line.qty) {
+        toast.error(`Qty must be between 1 and ${line.qty - 1}`)
+        setBusy(false)
+        return
+      }
+      body = { action: 'reduce_qty', qty: n, reason }
+    } else {
+      body = { action: 'remove', reason, bounceToQueue: bounceBack }
+    }
+    const r = await fetch(`/api/batches/${batchId}/items/${line.orderItemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    setBusy(false)
+    if (!r.ok) {
+      const { error } = await r.json().catch(() => ({ error: 'Edit failed' }))
+      toast.error(error || 'Edit failed')
+      return
+    }
+    const d = await r.json()
+    if (mode === 'reduce') {
+      toast.success(`Qty ${line.qty} → ${d.newQty} · ${d.bouncedQty} bounced back to queue`)
+    } else {
+      toast.success(d.bouncedToQueue ? 'Item bounced back to queue' : 'Item cancelled')
+    }
+    setOpen(false)
+    router.refresh()
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-[12px] text-slate-500 hover:text-emerald-700 underline"
+        title="Reduce qty or remove from this batch (because it wasn't actually shipped)"
+      >
+        Edit
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit batch line</DialogTitle>
+            <DialogDescription>
+              Use this if the label was printed but the item didn&apos;t actually ship (out-of-stock at pack time, etc.).
+              The remainder bounces back to the queue so it can ship later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-[13px]">
+            <div className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+              <div className="font-mono text-[12px] text-slate-500">{line.sku || 'no-sku'}</div>
+              <div className="text-slate-900">{line.name}</div>
+              <div className="text-[12px] text-slate-600 mt-0.5">Order #{line.orderNumber} · qty {line.qty}</div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMode('reduce')}
+                disabled={line.qty <= 1}
+                className={`flex-1 text-[12px] py-1.5 rounded border ${mode === 'reduce' ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400'} disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                Reduce qty
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('remove')}
+                className={`flex-1 text-[12px] py-1.5 rounded border ${mode === 'remove' ? 'bg-red-600 text-white border-red-700' : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400'}`}
+              >
+                Remove line
+              </button>
+            </div>
+
+            {mode === 'reduce' ? (
+              <div>
+                <Label htmlFor="nq">New qty (was {line.qty})</Label>
+                <Input id="nq" type="number" min={1} max={line.qty - 1} value={newQty} onChange={e => setNewQty(e.target.value)} className="tabular-nums" />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Difference ({Math.max(0, line.qty - (parseInt(newQty, 10) || 0))}) bounces back to the queue as a pending item on order #{line.orderNumber}.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="flex items-center gap-2 text-[12px]">
+                  <input type="checkbox" checked={bounceBack} onChange={e => setBounceBack(e.target.checked)} />
+                  Bounce back to queue (will ship in a later batch). Uncheck to cancel the item entirely.
+                </label>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="reason">Reason</Label>
+              <Textarea id="reason" rows={2} value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. out of stock at pack time, wrong item, damaged" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={submit} disabled={busy} className={mode === 'remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}>
+              {busy ? 'Saving…' : mode === 'remove' ? 'Remove' : 'Reduce'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
 }
 
 export function BatchLineEditor({
@@ -217,8 +344,12 @@ export function BatchLineEditor({
                           )}
                         </td>
                         <td className="px-3 py-1 text-right tabular-nums font-medium">{fromCents(totalCents)}</td>
-                        <td className="px-3 py-1 text-right text-[11px] text-slate-400">
-                          {savingSku === l.sku ? 'saving…' : ''}
+                        <td className="px-3 py-1 text-right text-[11px]">
+                          {savingSku === l.sku ? (
+                            <span className="text-slate-400">saving…</span>
+                          ) : !readOnly ? (
+                            <EditLineMenu batchId={batchId} line={l} />
+                          ) : null}
                         </td>
                       </tr>
                     )
