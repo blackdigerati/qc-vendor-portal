@@ -1,4 +1,4 @@
-import { desc, inArray } from 'drizzle-orm'
+import { desc, inArray, isNotNull } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { QueueTable, type QueueOrder } from './queue-table'
 import { fromCents } from '@/lib/money'
@@ -35,6 +35,20 @@ export default async function QueuePage() {
   for (const o of orders) emailCounts.set(o.email, (emailCounts.get(o.email) || 0) + 1)
   const mergeEmails = new Set([...emailCounts.entries()].filter(([, n]) => n > 1).map(([e]) => e))
 
+  // Build survivor → [absorbed order#s] map from the orders table
+  const mergedRows = db
+    .select()
+    .from(schema.orders)
+    .where(isNotNull(schema.orders.mergedIntoOrderNumber))
+    .all()
+  const mergedFrom = new Map<string, string[]>()
+  for (const m of mergedRows) {
+    if (!m.mergedIntoOrderNumber) continue
+    const list = mergedFrom.get(m.mergedIntoOrderNumber) || []
+    list.push(m.orderNumber)
+    mergedFrom.set(m.mergedIntoOrderNumber, list)
+  }
+
   const data: QueueOrder[] = orders.map(o => ({
     orderNumber: o.orderNumber,
     email: o.email,
@@ -44,6 +58,7 @@ export default async function QueuePage() {
     notes: o.notes,
     urgent: o.urgent,
     needsMerge: mergeEmails.has(o.email),
+    mergedFrom: mergedFrom.get(o.orderNumber) || [],
     ssVerifyStatus: o.ssVerifyStatus,
     items: items
       .filter(i => i.orderNumber === o.orderNumber)

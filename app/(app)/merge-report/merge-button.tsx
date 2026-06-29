@@ -58,7 +58,14 @@ export function MergeGroupButton({ email, candidates }: { email: string; candida
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={
-        <Button size="sm" variant={allMatch ? 'default' : 'outline'} className={allMatch ? 'bg-emerald-600 hover:bg-emerald-700' : ''}>
+        <Button
+          size="sm"
+          className={
+            allMatch
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              : 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600'
+          }
+        >
           Merge {candidates.length} orders
         </Button>
       } />

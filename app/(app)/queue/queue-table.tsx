@@ -30,6 +30,7 @@ export type QueueOrder = {
   notes: string
   urgent: boolean
   needsMerge: boolean
+  mergedFrom: string[]
   ssVerifyStatus: 'unverified' | 'verified' | 'email_matched' | 'not_found' | 'error'
   items: QueueItem[]
 }
@@ -191,9 +192,17 @@ export function QueueTable({
                         Urgent
                       </span>
                     )}
-                    {o.needsMerge && (
+                    {o.needsMerge && o.mergedFrom.length === 0 && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300">
                         Merge?
+                      </span>
+                    )}
+                    {o.mergedFrom.length > 0 && (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-slate-900 text-white"
+                        title={`Absorbed: ${o.mergedFrom.map(n => '#' + n).join(', ')}`}
+                      >
+                        Merged with {o.mergedFrom.map(n => '#' + n).join(', ')}
                       </span>
                     )}
                   </div>
