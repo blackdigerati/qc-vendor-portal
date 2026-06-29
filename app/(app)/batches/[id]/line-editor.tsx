@@ -207,6 +207,8 @@ function EditLineMenu({
   )
 }
 
+export type PendingItem = { id: string; sku: string; name: string; qty: number }
+
 export function BatchLineEditor({
   batchId,
   initialLines,
@@ -223,9 +225,17 @@ export function BatchLineEditor({
   invoiceTotalCents: number | null
   isAdmin: boolean
   mergedFromByOrder: Record<string, string[]>
-  partialPendingByOrder: Record<string, number>
+  partialPendingByOrder: Record<string, PendingItem[]>
   billingRule: BillingRule
 }) {
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
+  function togglePending(orderNumber: string) {
+    setExpandedOrders(prev => {
+      const next = new Set(prev)
+      next.has(orderNumber) ? next.delete(orderNumber) : next.add(orderNumber)
+      return next
+    })
+  }
   const router = useRouter()
   const [lines, setLines] = useState<BatchLine[]>(initialLines)
   const [savingSku, setSavingSku] = useState<string | null>(null)
@@ -373,18 +383,39 @@ export function BatchLineEditor({
                           Merged with {absorbed.map(n => '#' + n).join(', ')}
                         </span>
                       )}
-                      {(partialPendingByOrder[orderNumber] || 0) > 0 && (
-                        <span
-                          className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white"
-                          title={`${partialPendingByOrder[orderNumber]} item(s) on this order still in the queue`}
+                      {(partialPendingByOrder[orderNumber]?.length || 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => togglePending(orderNumber)}
+                          className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white hover:bg-blue-700"
+                          title="Click to see which items are still queued on this order"
                         >
-                          Partial · {partialPendingByOrder[orderNumber]} still queued
-                        </span>
+                          Partial · {partialPendingByOrder[orderNumber].length} still queued
+                          <span className="ml-1">{expandedOrders.has(orderNumber) ? '▾' : '▸'}</span>
+                        </button>
                       )}
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{fromCents(orderTotal)}</td>
                     <td></td>
                   </tr>
+                  {expandedOrders.has(orderNumber) && partialPendingByOrder[orderNumber]?.length > 0 && (
+                    <tr className="border-t border-blue-200 bg-blue-50">
+                      <td colSpan={7} className="px-8 py-2">
+                        <div className="text-[11px] uppercase tracking-wider font-semibold text-blue-900 mb-1">
+                          Still queued on #{orderNumber}
+                        </div>
+                        <div className="space-y-0.5">
+                          {partialPendingByOrder[orderNumber].map(p => (
+                            <div key={p.id} className="text-[12px] text-slate-700 flex items-baseline gap-2">
+                              <span className="font-mono text-[11px] text-slate-500 w-32 shrink-0">{p.sku || 'no-sku'}</span>
+                              <span className="flex-1">{p.name}</span>
+                              <span className="tabular-nums text-slate-500 shrink-0">×{p.qty}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {orderLines.map(l => {
                     const { handlingPerItemCents, totalCents } = lineNumbers(l)
                     const hasHandling = handlingPerItemCents > 0

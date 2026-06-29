@@ -70,11 +70,10 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
     mergedFromByOrder.set(it.orderNumber, list)
   }
 
-  // For each order in this batch, count items still queued elsewhere (i.e. NOT in
-  // this batch and NOT already shipped/cancelled) — these were bounced back to
-  // the queue or were on the order but not in this label. Used to badge the
-  // order header "Partial · N still in queue".
-  const partialPendingByOrder = new Map<string, number>()
+  // For each order in this batch, find items still queued elsewhere (bounced
+  // back to queue or never made it into a label). Surfaces as a "Partial · N
+  // still queued" badge that expands inline to show the actual items.
+  const partialPendingByOrder = new Map<string, { id: string; sku: string; name: string; qty: number }[]>()
   if (orderNums.length) {
     const allItemsForOrders = await db
       .select()
@@ -82,7 +81,9 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
       .where(inArray(schema.orderItems.orderNumber, orderNums))
     for (const it of allItemsForOrders) {
       if (it.status !== 'queued') continue
-      partialPendingByOrder.set(it.orderNumber, (partialPendingByOrder.get(it.orderNumber) || 0) + 1)
+      const list = partialPendingByOrder.get(it.orderNumber) || []
+      list.push({ id: it.id, sku: it.sku, name: it.name, qty: it.qty })
+      partialPendingByOrder.set(it.orderNumber, list)
     }
   }
 
