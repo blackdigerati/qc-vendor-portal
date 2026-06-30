@@ -87,8 +87,45 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
     }
   }
 
+  // Duplicate-shipment detection: if the same order_number appears across more
+  // than one distinct ssShipmentId in this batch, the vendor probably printed
+  // two labels for the same order — we'd otherwise bill twice. Flag at top.
+  const shipmentsByOrder = new Map<string, Set<string>>()
+  for (const it of items) {
+    if (!it.ssShipmentId) continue
+    const set = shipmentsByOrder.get(it.orderNumber) || new Set<string>()
+    set.add(it.ssShipmentId)
+    shipmentsByOrder.set(it.orderNumber, set)
+  }
+  const duplicateOrders = [...shipmentsByOrder.entries()]
+    .filter(([, set]) => set.size > 1)
+    .map(([orderNumber, set]) => ({ orderNumber, shipmentCount: set.size }))
+
   return (
     <div className="space-y-3">
+      {duplicateOrders.length > 0 && (
+        <div className="bg-red-50 border-2 border-red-400 rounded-md px-4 py-3 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-600 text-white text-[12px] font-bold flex-shrink-0">!</span>
+            <div className="flex-1">
+              <div className="text-[13px] font-semibold text-red-900">
+                Duplicate shipment{duplicateOrders.length > 1 ? 's' : ''} detected — review before invoicing
+              </div>
+              <div className="text-[12px] text-red-800 mt-0.5">
+                The same order appears on more than one label in this batch. If the vendor shipped the order once, remove the extra line(s) to avoid double-billing.
+              </div>
+              <ul className="mt-2 space-y-1">
+                {duplicateOrders.map(d => (
+                  <li key={d.orderNumber} className="text-[12px] text-red-900">
+                    <span className="font-mono font-semibold">#{d.orderNumber}</span>
+                    <span className="ml-2 text-red-700">— {d.shipmentCount} labels in this batch</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight font-mono">{batch.id}</h1>
