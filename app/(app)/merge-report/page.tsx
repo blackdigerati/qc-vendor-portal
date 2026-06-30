@@ -24,11 +24,16 @@ type Group = {
 }
 
 export default async function MergeReportPage() {
-  // Pull all orders — we need merged (cancelled) ones too so we can keep
-  // groups visible after a merge completes.
   const orders = await db.select().from(schema.orders)
-  const byEmail = new Map<string, typeof orders>()
-  for (const o of orders) {
+  // Only orders that are still actively mergeable, or that have already been merged.
+  // Shipped / cancelled (without a merge link) drop out entirely.
+  const eligible = orders.filter(o => {
+    if (o.mergedIntoOrderNumber) return true             // merged history
+    return o.status === 'queued' || o.status === 'partial' // still active
+  })
+
+  const byEmail = new Map<string, typeof eligible>()
+  for (const o of eligible) {
     const list = byEmail.get(o.email) || []
     list.push(o)
     byEmail.set(o.email, list)
@@ -36,11 +41,8 @@ export default async function MergeReportPage() {
 
   const groups: Group[] = []
   for (const [email, list] of byEmail) {
-    if (list.length < 2) continue
-    const active = list.filter(o => !o.mergedIntoOrderNumber && (o.status === 'queued' || o.status === 'partial'))
+    const active = list.filter(o => !o.mergedIntoOrderNumber)
     const merged = list.filter(o => !!o.mergedIntoOrderNumber)
-    const allCancelledOrShipped = active.length === 0
-    if (allCancelledOrShipped && merged.length === 0) continue // ancient history, drop
 
     let state: 'pending' | 'merged'
     let survivor: typeof schema.orders.$inferSelect | undefined
@@ -49,12 +51,9 @@ export default async function MergeReportPage() {
     } else if (active.length === 1 && merged.length > 0 && merged.every(m => m.mergedIntoOrderNumber === active[0].orderNumber)) {
       state = 'merged'
       survivor = active[0]
-    } else if (active.length === 0) {
-      // Survivor already shipped/batched — group is done, hide.
-      continue
     } else {
-      // 1 active and 1+ merged but the merged's mergedIntoOrderNumber doesn't point to active → odd state, show as pending
-      state = 'pending'
+      // 1 active alone with no merge history, or 0 active = nothing to merge anymore.
+      continue
     }
 
     const baseAddr = list[0] ? normalizeAddress(list[0]) : ''
