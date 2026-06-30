@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { desc, eq, inArray } from 'drizzle-orm'
 import { db, schema } from '@/db/client'
 import { fromCents } from '@/lib/money'
+import { computeHandlingPerItem } from '@/lib/billing-rules'
+import { getBillingRule } from '@/lib/billing-rules-db'
 import { FetchLabelsButton } from './fetch-labels-button'
 import { SimulateLabelsDialog, type SimQueueOrder } from './simulate-labels-dialog'
 
@@ -27,6 +29,29 @@ export default async function BatchesPage() {
   const invMap = new Map(invs.map(i => [i.id, i]))
   const cursor = (await db.select().from(schema.ssSyncCursor).where(eq(schema.ssSyncCursor.id, 1)))[0]
   const isDev = process.env.NODE_ENV !== 'production'
+
+  // Tentative totals — for uninvoiced batches we still want to show the running
+  // dollar value using current SKU prices + billing rule, so the vendor can
+  // eyeball it before clicking Create Invoice.
+  const tentativeTotalByBatch = new Map<string, number>()
+  const uninvoiced = batches.filter(b => !b.invoiceId).map(b => b.id)
+  if (uninvoiced.length) {
+    const rule = await getBillingRule()
+    const items = await db
+      .select()
+      .from(schema.orderItems)
+      .where(inArray(schema.orderItems.batchId, uninvoiced))
+    const skus = [...new Set(items.map(i => i.sku).filter(Boolean))]
+    const skuRows = skus.length ? await db.select().from(schema.skus).where(inArray(schema.skus.sku, skus)) : []
+    const skuMap = new Map(skuRows.map(r => [r.sku, r]))
+    for (const it of items) {
+      const sku = skuMap.get(it.sku)
+      const unit = sku?.baseCostCents ?? it.costOfGoodsCents
+      const handling = computeHandlingPerItem(unit, rule)
+      const line = (unit + handling) * it.qty
+      tentativeTotalByBatch.set(it.batchId!, (tentativeTotalByBatch.get(it.batchId!) || 0) + line)
+    }
+  }
 
   // Build queue snapshot for the dev simulate dialog
   let simQueue: SimQueueOrder[] = []
@@ -92,7 +117,18 @@ export default async function BatchesPage() {
                   <td className="px-3 py-1.5 text-slate-600 font-mono">
                     {inv ? <Link href={`/invoices/${inv.id}`} className="hover:text-emerald-700 hover:underline">{inv.id}</Link> : <span className="text-slate-400">—</span>}
                   </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums font-medium">{inv ? fromCents(inv.totalCents) : <span className="text-slate-400">—</span>}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums font-medium">
+                    {inv ? (
+                      fromCents(inv.totalCents)
+                    ) : tentativeTotalByBatch.has(b.id) ? (
+                      <span className="text-slate-500 italic" title="Tentative — based on current SKU prices. Locks when invoiced.">
+                        {fromCents(tentativeTotalByBatch.get(b.id) || 0)}
+                        <span className="ml-1 text-[10px] uppercase tracking-wider text-slate-400 not-italic">tentative</span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
                 </tr>
               )
             })}
